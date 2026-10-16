@@ -29,7 +29,7 @@ class SessionRowWidget(QFrame):
         self.badge_label = QLabel("待命", self)
         self.badge_label.setFont(QFont("Segoe UI", 9, QFont.Bold))
         self.set_badge_style("idle")
-        layout.addWidget(self.badge_label)
+        layout.addWidget(self.badge_label, 0, Qt.AlignVCenter)
 
         # 2. Project or session directory name
         self.name_label = QLabel("---", self)

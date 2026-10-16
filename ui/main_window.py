@@ -205,6 +205,7 @@ class OpenCodeTokenMonitor(QWidget):
         self.rows[2].setVisible(not self.mini_mode)
         self.mode_btn.setText("+" if self.mini_mode else "–")
         self.tray.set_mini_mode_state(self.mini_mode)
+        self.setMinimumSize(0, 0)
         self.adjustSize()
 
     def toggle_lock(self):
