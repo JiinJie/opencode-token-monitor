@@ -1,0 +1,47 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# PyInstaller
+*.manifest
+*.spec
+build/
+dist/
+
+# Backups
+backup_*/
+V1.0_cn/
+*.backup.md
+*.bak
+
+# Logs and databases
+*.log
+widget.log
+*.sqlite
+*.sqlite3
+*.db
+*.db-wal
+*.db-shm
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# IDE files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS files
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Test files
+test_*.png
+test_*.ico
