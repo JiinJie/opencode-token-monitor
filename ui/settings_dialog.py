@@ -7,7 +7,7 @@ import os
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QLineEdit, QComboBox, QCheckBox, QGroupBox, QSlider,
-    QRadioButton, QButtonGroup, QListView,
+    QRadioButton, QButtonGroup,
     QFileDialog, QFrame, QScrollArea, QWidget
 )
 from PyQt5.QtCore import Qt, QUrl
@@ -22,18 +22,6 @@ from core.config import (
     get_settings_file_path, get_log_file_path
 )
 from .styles import DIALOG_STYLE
-
-
-class NoWheelComboBox(QComboBox):
-    """QComboBox that ignores mouse wheel events to prevent accidental changes when scrolling."""
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setView(QListView())
-
-    def wheelEvent(self, event):
-        # Ignore wheel event so parent QScrollArea scrolls smoothly without accidental selection changes
-        event.ignore()
 
 
 class SettingsDialog(QDialog):
@@ -154,7 +142,7 @@ class SettingsDialog(QDialog):
 
         row_int = QHBoxLayout()
         row_int.addWidget(QLabel("采样刷新间隔:", group_perf))
-        self.interval_combo = NoWheelComboBox(group_perf)
+        self.interval_combo = QComboBox(group_perf)
         self.interval_combo.setMinimumHeight(28)
         for ms, label in SUPPORTED_REFRESH_INTERVALS:
             self.interval_combo.addItem(label, ms)
@@ -206,7 +194,7 @@ class SettingsDialog(QDialog):
         row_count_label.setStyleSheet("color: #F3F4F6; font-size: 12px;")
         row_count_layout.addWidget(row_count_label)
 
-        self.rows_combo = NoWheelComboBox(group_win)
+        self.rows_combo = QComboBox(group_win)
         self.rows_combo.setMinimumHeight(28)
         for n in range(1, 9):
             text = f"{n} 行 (默认推荐)" if n == 3 else f"{n} 行"
