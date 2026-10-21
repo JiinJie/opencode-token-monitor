@@ -257,9 +257,6 @@ class OpenCodeTokenMonitor(QWidget):
         except Exception:
             pass
 
-        # 4. Periodically enforce Win32 topmost priority without stealing focus
-        self.force_topmost()
-
     def force_topmost(self):
         """Enforce native Win32 HWND_TOPMOST so floating widget strictly stays in front of all applications."""
         if sys.platform == "win32" and self.isVisible():
