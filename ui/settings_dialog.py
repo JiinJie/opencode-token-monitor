@@ -7,7 +7,7 @@ import os
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QLineEdit, QComboBox, QCheckBox, QGroupBox, QSlider,
-    QRadioButton, QButtonGroup,
+    QRadioButton, QButtonGroup, QApplication,
     QFileDialog, QFrame, QScrollArea, QWidget
 )
 from PyQt5.QtCore import Qt, QUrl
@@ -39,6 +39,9 @@ class SettingsDialog(QDialog):
         self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)
         self.setFont(QFont("Microsoft YaHei UI", 9))
         self.setStyleSheet(DIALOG_STYLE)
+
+        # Disable Qt slow sliding animation on combobox dropdowns for instant popup
+        QApplication.setEffectEnabled(Qt.UI_AnimateCombo, False)
 
         self._init_ui()
         self._load_from_settings()

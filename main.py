@@ -93,6 +93,7 @@ def run_gui_mode(db_path: str, interval_ms: int, start_mini: bool = False):
             except Exception:
                 pass
 
+    from PyQt5.QtCore import Qt
     from PyQt5.QtWidgets import QApplication
     from PyQt5.QtGui import QFont
     from ui.main_window import OpenCodeTokenMonitor
@@ -110,6 +111,8 @@ def run_gui_mode(db_path: str, interval_ms: int, start_mini: bool = False):
         app.setQuitOnLastWindowClosed(False)
         # Set crisp unified UI font globally
         app.setFont(QFont("Microsoft YaHei UI", 9))
+        # Disable sluggish Qt slide animation on combo dropdowns for instant snappy popups
+        app.setEffectEnabled(Qt.UI_AnimateCombo, False)
 
         monitor = OpenCodeTokenMonitor(db_path=db_path, refresh_interval=interval_ms)
         if start_mini:
