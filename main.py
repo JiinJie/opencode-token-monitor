@@ -9,6 +9,13 @@ import os
 import time
 import argparse
 
+# Ensure stdout handles unicode emojis seamlessly in Windows terminal
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 # Ensure project root directory is present in sys.path
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 if BASE_DIR not in sys.path:

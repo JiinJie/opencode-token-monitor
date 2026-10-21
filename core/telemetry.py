@@ -155,23 +155,43 @@ class OpenCodeTelemetry:
                 """, (msg_id,))
                 part_rows = cur.fetchall()
 
-                step_start_ms = cr_ms
-                parts_data = []
+                req_start_ms = cr_ms
+                step_start_ms = None
+                step_finish_ms = None
+                first_part_ms = None
+                parts_content = []
 
                 for pr in part_rows:
                     try:
                         p_data = json.loads(pr[1])
                         p_type = p_data.get("type")
+                        p_tc = pr[0]
                         if p_type == "step-start":
-                            step_start_ms = pr[0]
-                        elif p_type in ("reasoning", "text"):
-                            p_start = p_data.get("time", {}).get("start") or pr[0]
+                            step_start_ms = p_tc
+                        elif p_type == "step-finish":
+                            step_finish_ms = p_tc
+                        elif p_type in ("reasoning", "text", "tool", "patch"):
+                            p_start = p_data.get("time", {}).get("start") or p_tc
                             p_text = p_data.get("text", "") or ""
-                            parts_data.append((pr[0], p_start, p_text))
+                            parts_content.append((p_tc, p_start, p_type, p_text))
+                            if first_part_ms is None or p_start < first_part_ms:
+                                first_part_ms = p_start
                     except Exception:
                         continue
 
-                total_chars = sum(len(p[2] or "") for p in parts_data)
+                # Determine the arrival timestamp of the first token/response event
+                first_tok_ms = None
+                if step_start_ms is not None and first_part_ms is not None:
+                    first_tok_ms = min(step_start_ms, first_part_ms)
+                elif step_start_ms is not None:
+                    first_tok_ms = step_start_ms
+                elif first_part_ms is not None:
+                    first_tok_ms = first_part_ms
+
+                if first_tok_ms is not None and first_tok_ms < req_start_ms:
+                    first_tok_ms = req_start_ms
+
+                total_chars = sum(len(p[3] or "") for p in parts_content)
                 total_out = out_tok + reas_tok
 
                 is_waiting_ttft = False
@@ -186,41 +206,43 @@ class OpenCodeTelemetry:
 
                 if not c_ms:
                     # Request in progress (completed timestamp not yet recorded)
-                    if self.enable_ttft and (not parts_data or total_chars == 0):
+                    if self.enable_ttft and (first_tok_ms is None or (not parts_content and not step_start_ms)):
                         # Phase 1: Waiting for first token from server (TTFT stage)
                         is_waiting_ttft = True
-                        ttft_s = max(0.1, (now_ms - step_start_ms) / 1000.0)
+                        ttft_s = max(0.1, (now_ms - req_start_ms) / 1000.0)
+                        total_s = ttft_s
+                        decode_s = 0.0
                     else:
                         # Phase 2: Active streaming decoding
                         is_generating = True
-                        first_tok_ms = parts_data[0][1] or parts_data[0][0] if parts_data else step_start_ms
-                        ttft_s = max(0.01, (first_tok_ms - step_start_ms) / 1000.0)
-                        decode_s = max(0.1, (now_ms - first_tok_ms) / 1000.0)
-                        total_s = max(0.1, (now_ms - step_start_ms) / 1000.0)
+                        first_ms = first_tok_ms if first_tok_ms is not None else req_start_ms
+                        ttft_s = max(0.01, (first_ms - req_start_ms) / 1000.0)
+                        decode_s = max(0.1, (now_ms - first_ms) / 1000.0)
+                        total_s = max(0.1, (now_ms - req_start_ms) / 1000.0)
                         est_tok = max(total_out, total_chars * 0.5)
                         decode_tps = est_tok / decode_s
                         effective_tps = est_tok / total_s
                         tps = decode_tps
                 else:
                     # Phase 3: Round finished
-                    if parts_data:
-                        first_tok_ms = parts_data[0][1] or parts_data[0][0]
-                        ttft_s = max(0.01, (first_tok_ms - step_start_ms) / 1000.0)
-                        decode_s = max(0.01, (c_ms - first_tok_ms) / 1000.0)
-                        total_s = max(0.01, (c_ms - step_start_ms) / 1000.0)
+                    end_ms = c_ms or (step_finish_ms if step_finish_ms else now_ms)
+                    total_s = max(0.01, (end_ms - req_start_ms) / 1000.0)
+
+                    if first_tok_ms is not None:
+                        ttft_s = max(0.01, (first_tok_ms - req_start_ms) / 1000.0)
+                        decode_s = max(0.01, (end_ms - first_tok_ms) / 1000.0)
                     else:
-                        total_s = max(0.01, (c_ms - step_start_ms) / 1000.0)
-                        decode_s = total_s
                         ttft_s = 0.0
+                        decode_s = total_s
 
                     effective_tps = total_out / max(0.01, total_s)
                     decode_tps = total_out / max(0.01, decode_s)
 
                     # Anti-Burst Detection:
-                    # Conditions: extremely fast transfer with many tokens, or long total time with very low decode ratio
+                    # Conditions: extremely fast transfer with many tokens, or sudden dump after long latency
                     if self.enable_anti_burst and (
                         (decode_s < BURST_DECODE_THRESHOLD_S and total_out > BURST_MIN_TOKENS) or \
-                        (total_s > BURST_MIN_TOTAL_S and (decode_s / total_s) < BURST_RATIO_THRESHOLD)
+                        (decode_s < 1.2 and total_s > BURST_MIN_TOTAL_S and (decode_s / total_s) < BURST_RATIO_THRESHOLD)
                     ):
                         is_burst = True
                         tps = effective_tps  # Fallback to end-to-end human-perceived throughput
