@@ -42,10 +42,10 @@ class OpenCodeTokenMonitor(QWidget):
         self.settings = AppSettings.load()
         if db_path:
             self.settings.db_path = db_path
-        if refresh_interval != DEFAULT_REFRESH_INTERVAL_MS:
+        if refresh_interval is not None:
             self.settings.refresh_interval_ms = refresh_interval
 
-        self.refresh_interval = self.settings.refresh_interval_ms
+        self.refresh_interval = self.settings.refresh_interval_ms or DEFAULT_REFRESH_INTERVAL_MS
 
         # Telemetry core engine
         self.telemetry = OpenCodeTelemetry(
@@ -236,10 +236,11 @@ class OpenCodeTokenMonitor(QWidget):
 
     def set_refresh_rate(self, ms: int):
         """Update polling frequency interval."""
-        self.refresh_interval = ms
-        self.settings.refresh_interval_ms = ms
+        valid_ms = ms or DEFAULT_REFRESH_INTERVAL_MS
+        self.refresh_interval = valid_ms
+        self.settings.refresh_interval_ms = valid_ms
         self.settings.save()
-        self.timer.setInterval(ms)
+        self.timer.setInterval(valid_ms)
 
     def open_settings(self):
         """Open Settings preferences dialog."""
