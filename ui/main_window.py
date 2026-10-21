@@ -136,17 +136,34 @@ class OpenCodeTokenMonitor(QWidget):
 
         self.card_layout.addWidget(self.header)
 
-        # Create 3 display rows
-        for i in range(3):
-            row_widget = SessionRowWidget(i, self.card)
-            self.rows.append(row_widget)
-            self.card_layout.addWidget(row_widget)
+        # Create display rows (1 to 8 rows configurable)
+        self._update_row_count(self.settings.display_rows)
 
         self.adjustSize()
 
         # Default position: top right of primary screen
         screen = QApplication.primaryScreen().geometry()
         self.move(screen.width() - self.sizeHint().width() - 35, 45)
+
+    def _update_row_count(self, count: int):
+        """Dynamically adjust the number of session rows (1 to 8)."""
+        count = max(1, min(8, count))
+        current = len(self.rows)
+
+        if count > current:
+            for i in range(current, count):
+                row_widget = SessionRowWidget(i, self.card)
+                if self.mini_mode and i > 0:
+                    row_widget.setVisible(False)
+                self.rows.append(row_widget)
+                self.card_layout.addWidget(row_widget)
+        elif count < current:
+            while len(self.rows) > count:
+                row_widget = self.rows.pop()
+                self.card_layout.removeWidget(row_widget)
+                row_widget.deleteLater()
+
+        self.adjustSize()
 
     def _init_tray(self):
         """Initialize system tray integration."""
@@ -165,13 +182,20 @@ class OpenCodeTokenMonitor(QWidget):
     def refresh_metrics(self):
         """Core data polling and metric dispatch engine."""
         state: MonitorState = self.telemetry.collect()
+        total_rows = len(self.rows)
+        if total_rows == 0:
+            return
 
         if not state.db_exists:
             self.rows[0].update_data("idle", "[无库]", "未找到OpenCode库", "0.0 tok/s", "#6B7280", "请检查路径")
+            for i in range(1, total_rows):
+                self.rows[i].update_data("idle", "[待命]", "无库", "-- tok/s", "#6B7280", "等待数据库")
             return
 
         if not state.foreground_session:
             self.rows[0].update_data("idle", "[待命]", "无活跃会话", "-- tok/s", "#6B7280", "等待任务")
+            for i in range(1, total_rows):
+                self.rows[i].update_data("idle", "[待命]", "无更多会话", "-- tok/s", "#6B7280", "等待任务")
             return
 
         # 1. Render Row 0: Active foreground session
@@ -182,8 +206,8 @@ class OpenCodeTokenMonitor(QWidget):
             fg_info=state.foreground_info
         )
 
-        # 2. Render Rows 1 and 2: Recent background sessions
-        for i in range(1, 3):
+        # 2. Render Remaining Rows: Recent background sessions
+        for i in range(1, total_rows):
             idx = i - 1
             if idx < len(state.other_sessions):
                 self.rows[i].render_session(state.other_sessions[idx], is_foreground_row=False)
@@ -218,13 +242,13 @@ class OpenCodeTokenMonitor(QWidget):
         self.tray.show_minimize_toast()
 
     def toggle_mini_mode(self):
-        """Toggle between 1-row mini capsule and 3-row full panel."""
+        """Toggle between 1-row mini capsule and full panel."""
         self.mini_mode = not self.mini_mode
         self.header.setVisible(not self.mini_mode)
-        self.rows[1].setVisible(not self.mini_mode)
-        self.rows[2].setVisible(not self.mini_mode)
+        for i in range(1, len(self.rows)):
+            self.rows[i].setVisible(not self.mini_mode)
         self.mode_btn.setText("+" if self.mini_mode else "–")
-        self.tray.set_mini_mode_state(self.mini_mode)
+        self.tray.set_mini_mode_state(self.mini_mode, len(self.rows))
         self.setMinimumSize(0, 0)
         self.adjustSize()
 
@@ -257,6 +281,10 @@ class OpenCodeTokenMonitor(QWidget):
         self.settings = new_settings
         self.refresh_interval = self.settings.refresh_interval_ms
         self.timer.setInterval(self.refresh_interval)
+
+        # Dynamically update displayed rows count if changed
+        if len(self.rows) != self.settings.display_rows:
+            self._update_row_count(self.settings.display_rows)
 
         # Update telemetry parameters
         self.telemetry.db_path = self.settings.db_path
@@ -300,7 +328,7 @@ class OpenCodeTokenMonitor(QWidget):
         menu = QMenu(self)
         menu.setStyleSheet(MENU_STYLE)
 
-        mode_text = "展开为 3行完整面板" if self.mini_mode else "收起为 1行迷你胶囊"
+        mode_text = f"展开为 {len(self.rows)}行完整面板" if self.mini_mode else "收起为 1行迷你胶囊"
         toggle_mode_act = QAction(mode_text, self)
         toggle_mode_act.triggered.connect(self.toggle_mini_mode)
         menu.addAction(toggle_mode_act)

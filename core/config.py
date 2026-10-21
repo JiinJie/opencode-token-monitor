@@ -80,6 +80,7 @@ class AppSettings:
     """Application persistent user configuration model."""
     db_path: str = DEFAULT_DB_PATH
     refresh_interval_ms: int = DEFAULT_REFRESH_INTERVAL_MS
+    display_rows: int = 3  # Configurable range: 1 - 8 rows
     enable_anti_burst: bool = True
     enable_ttft: bool = True
     start_mini: bool = False
@@ -94,7 +95,10 @@ class AppSettings:
                 with open(path, "r", encoding="utf-8") as f:
                     data = json.load(f)
                     valid_keys = {k: v for k, v in data.items() if k in cls.__dataclass_fields__}
-                    return cls(**valid_keys)
+                    inst = cls(**valid_keys)
+                    if not (1 <= inst.display_rows <= 8):
+                        inst.display_rows = 3
+                    return inst
             except Exception:
                 pass
         return cls()

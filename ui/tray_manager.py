@@ -126,9 +126,9 @@ class TrayManager:
         """Synchronize visibility menu item text."""
         self.act_toggle_vis.setText("隐藏监控悬浮窗" if is_visible else "显示监控悬浮窗")
 
-    def set_mini_mode_state(self, is_mini: bool):
+    def set_mini_mode_state(self, is_mini: bool, row_count: int = 3):
         """Synchronize mini/full mode menu item text."""
-        self.act_toggle_mode.setText("展开为 3行完整面板" if is_mini else "收起为 1行迷你胶囊")
+        self.act_toggle_mode.setText(f"展开为 {row_count}行完整面板" if is_mini else "收起为 1行迷你胶囊")
 
     def set_lock_state(self, is_locked: bool):
         """Synchronize window lock menu item text."""

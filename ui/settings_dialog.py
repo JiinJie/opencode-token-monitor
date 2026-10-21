@@ -174,11 +174,31 @@ class SettingsDialog(QDialog):
 
         scroll_layout.addWidget(group_algo)
 
-        # --- Group 4: Window & Startup Preferences ---
-        group_win = QGroupBox("📌 启动与行为偏好", scroll_content)
+        # --- Group 4: Window & Display Preferences ---
+        group_win = QGroupBox("📌 列表显示与启动偏好", scroll_content)
         win_layout = QVBoxLayout(group_win)
         win_layout.setSpacing(10)
         win_layout.setContentsMargins(12, 18, 12, 14)
+
+        # Row: Display Rows Count (1 - 8)
+        row_count_layout = QHBoxLayout()
+        row_count_label = QLabel("列表展示会话行数:", group_win)
+        row_count_label.setStyleSheet("color: #F3F4F6; font-size: 12px;")
+        row_count_layout.addWidget(row_count_label)
+
+        self.rows_combo = QComboBox(group_win)
+        self.rows_combo.setMinimumHeight(28)
+        for n in range(1, 9):
+            text = f"{n} 行 (默认推荐)" if n == 3 else f"{n} 行"
+            self.rows_combo.addItem(text, n)
+        row_count_layout.addWidget(self.rows_combo)
+        row_count_layout.addStretch()
+        win_layout.addLayout(row_count_layout)
+
+        rows_tip = QLabel("主面板支持展示 1 至 8 行会话（第 1 行为前台当前任务，其余行为后台活动会话或 Subagent）。", group_win)
+        rows_tip.setStyleSheet("color: #64748B; font-size: 11px;")
+        rows_tip.setWordWrap(True)
+        win_layout.addWidget(rows_tip)
 
         self.start_mini_check = QCheckBox("启动时默认进入 1 行极简迷你胶囊模式", group_win)
         self.start_mini_check.setStyleSheet("color: #F3F4F6; font-size: 12px;")
@@ -237,6 +257,13 @@ class SettingsDialog(QDialog):
         if idx >= 0:
             self.interval_combo.setCurrentIndex(idx)
 
+        # Display rows combo
+        rows_idx = self.rows_combo.findData(self.settings.display_rows)
+        if rows_idx >= 0:
+            self.rows_combo.setCurrentIndex(rows_idx)
+        else:
+            self.rows_combo.setCurrentIndex(2)  # Default: 3 rows
+
         # Checkboxes
         self.anti_burst_check.setChecked(self.settings.enable_anti_burst)
         self.ttft_check.setChecked(self.settings.enable_ttft)
@@ -279,6 +306,7 @@ class SettingsDialog(QDialog):
         """Save settings to disk and invoke callback."""
         self.settings.db_path = self.path_edit.text().strip()
         self.settings.refresh_interval_ms = self.interval_combo.currentData()
+        self.settings.display_rows = self.rows_combo.currentData() or 3
         self.settings.enable_anti_burst = self.anti_burst_check.isChecked()
         self.settings.enable_ttft = self.ttft_check.isChecked()
         self.settings.start_mini = self.start_mini_check.isChecked()
