@@ -77,29 +77,8 @@ def run_cli_mode(db_path: str = None, interval_ms: int = None):
 
 def run_gui_mode(db_path: str, interval_ms: int, start_mini: bool = False):
     """Launch PyQt5 desktop floating widget mode."""
-    # 1. Enable OS-level High-DPI awareness on Windows to prevent DWM bitmap stretching blur
-    if sys.platform == "win32":
-        try:
-            import ctypes
-            # PROCESS_PER_MONITOR_DPI_AWARE_V2 = 2
-            ctypes.windll.shcore.SetProcessDpiAwareness(2)
-        except Exception:
-            try:
-                import ctypes
-                ctypes.windll.user32.SetProcessDPIAware()
-            except Exception:
-                pass
-
-    from PyQt5.QtCore import Qt
-    from PyQt5.QtGui import QGuiApplication
     from PyQt5.QtWidgets import QApplication
     from ui.main_window import OpenCodeTokenMonitor
-
-    # 2. Enable Qt High-DPI vector scaling & fractional DPI PassThrough
-    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
-    QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
-    if hasattr(QGuiApplication, "setHighDpiScaleFactorRoundingPolicy") and hasattr(Qt, "HighDpiScaleFactorRoundingPolicy"):
-        QGuiApplication.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
 
     settings = AppSettings.load()
     log_path = get_log_file_path(settings.storage_mode)
