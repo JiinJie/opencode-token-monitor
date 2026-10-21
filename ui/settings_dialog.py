@@ -256,7 +256,7 @@ class SettingsDialog(QDialog):
         storage_layout.setSpacing(10)
         storage_layout.setContentsMargins(12, 18, 12, 14)
 
-        storage_tip = QLabel("可自由选择配置文件 (settings.json) 与运行日志 (widget.log) 的持久化保存位置：", group_storage)
+        storage_tip = QLabel("可自由选择配置文件 (settings.json) 与运行日志 (opencode_monitor.log) 的持久化保存位置：", group_storage)
         storage_tip.setStyleSheet("color: #94A3B8; font-size: 11px;")
         storage_tip.setWordWrap(True)
         storage_layout.addWidget(storage_tip)

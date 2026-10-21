@@ -129,15 +129,18 @@ def get_settings_file_path(mode: str = None) -> str:
     return local_cfg
 
 
+DEFAULT_LOG_FILENAME = "opencode_monitor.log"
+
+
 def get_log_file_path(mode: str = None) -> str:
-    """Get the path to widget.log based on storage mode."""
+    """Get the path to opencode_monitor.log based on storage mode."""
     if not mode:
         cfg_path = get_settings_file_path()
         if get_appdata_dir().lower() in os.path.abspath(cfg_path).lower():
             mode = STORAGE_MODE_APPDATA
         else:
             mode = STORAGE_MODE_PORTABLE
-    return os.path.join(get_storage_dir(mode), "widget.log")
+    return os.path.join(get_storage_dir(mode), DEFAULT_LOG_FILENAME)
 
 
 @dataclass

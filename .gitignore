@@ -18,6 +18,7 @@ V1.0_cn/
 # Logs, databases and local settings
 *.log
 widget.log
+opencode_monitor.log
 settings.json
 *.sqlite
 *.sqlite3
