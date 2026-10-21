@@ -15,7 +15,6 @@ from PyQt5.QtGui import QDesktopServices
 
 from core.config import (
     APP_NAME, DEFAULT_DB_PATH, DEFAULT_REFRESH_INTERVAL_MS,
-    DEFAULT_LOG_FILENAME,
     SUPPORTED_REFRESH_INTERVALS, AppSettings,
     STORAGE_MODE_PORTABLE, STORAGE_MODE_APPDATA,
     get_app_dir, get_appdata_dir, get_storage_dir,
@@ -271,7 +270,7 @@ class SettingsDialog(QDialog):
         self.storage_btn_group.addButton(self.radio_portable, 1)
         storage_layout.addWidget(self.radio_portable)
 
-        portable_hint = QLabel(f"• 示意位置: 当前程序目录\\ (settings.json / {DEFAULT_LOG_FILENAME})\n  配置与日志直接跟随程序，免安装解压即用。", group_storage)
+        portable_hint = QLabel(f"• 路径: {get_app_dir()}\n  配置与日志直接跟随程序脚本/可执行文件，适合免安装便携移动使用。", group_storage)
         portable_hint.setStyleSheet("color: #64748B; font-size: 11px; margin-left: 24px;")
         portable_hint.setWordWrap(True)
         storage_layout.addWidget(portable_hint)
@@ -282,7 +281,7 @@ class SettingsDialog(QDialog):
         self.storage_btn_group.addButton(self.radio_appdata, 2)
         storage_layout.addWidget(self.radio_appdata)
 
-        appdata_hint = QLabel(f"• 示意位置: %APPDATA%\\OpenCodeTokenMonitor\\ (settings.json / {DEFAULT_LOG_FILENAME})\n  遵循标准 Windows 应用程序规范，不产生本地目录写入污染。", group_storage)
+        appdata_hint = QLabel(f"• 路径: {get_appdata_dir()}\n  遵循标准 Windows 应用程序规范，不产生本地写入污染，适合日常长期使用。", group_storage)
         appdata_hint.setStyleSheet("color: #64748B; font-size: 11px; margin-left: 24px;")
         appdata_hint.setWordWrap(True)
         storage_layout.addWidget(appdata_hint)
