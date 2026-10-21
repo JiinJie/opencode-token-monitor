@@ -7,13 +7,18 @@ import os
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QLineEdit, QComboBox, QCheckBox, QGroupBox, QSlider,
+    QRadioButton, QButtonGroup,
     QFileDialog, QFrame, QScrollArea, QWidget
 )
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QUrl
+from PyQt5.QtGui import QDesktopServices
 
 from core.config import (
     APP_NAME, DEFAULT_DB_PATH, DEFAULT_REFRESH_INTERVAL_MS,
-    SUPPORTED_REFRESH_INTERVALS, AppSettings
+    SUPPORTED_REFRESH_INTERVALS, AppSettings,
+    STORAGE_MODE_PORTABLE, STORAGE_MODE_APPDATA,
+    get_app_dir, get_appdata_dir, get_storage_dir,
+    get_settings_file_path, get_log_file_path
 )
 from .styles import DIALOG_STYLE
 
@@ -245,6 +250,74 @@ class SettingsDialog(QDialog):
 
         scroll_layout.addWidget(group_win)
 
+        # --- Group 5: Configuration & Log Storage Location ---
+        group_storage = QGroupBox("📁 配置文件与运行日志位置", scroll_content)
+        storage_layout = QVBoxLayout(group_storage)
+        storage_layout.setSpacing(10)
+        storage_layout.setContentsMargins(12, 18, 12, 14)
+
+        storage_tip = QLabel("可自由选择配置文件 (settings.json) 与运行日志 (widget.log) 的持久化保存位置：", group_storage)
+        storage_tip.setStyleSheet("color: #94A3B8; font-size: 11px;")
+        storage_tip.setWordWrap(True)
+        storage_layout.addWidget(storage_tip)
+
+        self.storage_btn_group = QButtonGroup(group_storage)
+
+        # Option 1: Portable Mode (app directory)
+        self.radio_portable = QRadioButton("当前执行文件所在文件夹 (绿色便携模式 Portable)", group_storage)
+        self.radio_portable.setStyleSheet("color: #F3F4F6; font-size: 12px; font-weight: 500;")
+        self.radio_portable.toggled.connect(self._on_storage_mode_toggled)
+        self.storage_btn_group.addButton(self.radio_portable, 1)
+        storage_layout.addWidget(self.radio_portable)
+
+        portable_hint = QLabel(f"• 路径: {get_app_dir()}\n  配置与日志直接跟随程序脚本/可执行文件，适合免安装便携移动使用。", group_storage)
+        portable_hint.setStyleSheet("color: #64748B; font-size: 11px; margin-left: 24px;")
+        portable_hint.setWordWrap(True)
+        storage_layout.addWidget(portable_hint)
+
+        # Option 2: Standard User AppData
+        self.radio_appdata = QRadioButton("系统用户默认数据位置 (标准模式 AppData)", group_storage)
+        self.radio_appdata.setStyleSheet("color: #F3F4F6; font-size: 12px; font-weight: 500;")
+        self.radio_appdata.toggled.connect(self._on_storage_mode_toggled)
+        self.storage_btn_group.addButton(self.radio_appdata, 2)
+        storage_layout.addWidget(self.radio_appdata)
+
+        appdata_hint = QLabel(f"• 路径: {get_appdata_dir()}\n  遵循标准 Windows 应用程序规范，不产生本地写入污染，适合日常长期使用。", group_storage)
+        appdata_hint.setStyleSheet("color: #64748B; font-size: 11px; margin-left: 24px;")
+        appdata_hint.setWordWrap(True)
+        storage_layout.addWidget(appdata_hint)
+
+        # Current active paths preview
+        paths_box = QFrame(group_storage)
+        paths_box.setStyleSheet("background-color: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 6px; padding: 6px 10px;")
+        paths_layout = QVBoxLayout(paths_box)
+        paths_layout.setContentsMargins(0, 0, 0, 0)
+        paths_layout.setSpacing(4)
+
+        self.storage_cfg_path_label = QLabel(paths_box)
+        self.storage_cfg_path_label.setStyleSheet("color: #94A3B8; font-size: 11px; font-family: 'Consolas', 'Segoe UI';")
+        self.storage_cfg_path_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        paths_layout.addWidget(self.storage_cfg_path_label)
+
+        self.storage_log_path_label = QLabel(paths_box)
+        self.storage_log_path_label.setStyleSheet("color: #94A3B8; font-size: 11px; font-family: 'Consolas', 'Segoe UI';")
+        self.storage_log_path_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        paths_layout.addWidget(self.storage_log_path_label)
+
+        storage_layout.addWidget(paths_box)
+
+        # Action: Open Storage Folder
+        storage_action_row = QHBoxLayout()
+        self.open_folder_btn = QPushButton("📂 打开当前存储文件夹", group_storage)
+        self.open_folder_btn.setMinimumHeight(28)
+        self.open_folder_btn.setToolTip("在 Windows 资源管理器中打开当前选中的配置与日志存储目录")
+        self.open_folder_btn.clicked.connect(self._open_storage_folder)
+        storage_action_row.addWidget(self.open_folder_btn)
+        storage_action_row.addStretch()
+        storage_layout.addLayout(storage_action_row)
+
+        scroll_layout.addWidget(group_storage)
+
         scroll_area.setWidget(scroll_content)
         card_layout.addWidget(scroll_area)
 
@@ -309,6 +382,31 @@ class SettingsDialog(QDialog):
         self.ttft_check.setChecked(self.settings.enable_ttft)
         self.start_mini_check.setChecked(self.settings.start_mini)
         self.lock_check.setChecked(self.settings.locked)
+
+        # Storage mode
+        if self.settings.storage_mode == STORAGE_MODE_APPDATA:
+            self.radio_appdata.setChecked(True)
+        else:
+            self.radio_portable.setChecked(True)
+        self._on_storage_mode_toggled()
+
+    def _on_storage_mode_toggled(self):
+        """Update active path display when user toggles storage radio button."""
+        selected_mode = STORAGE_MODE_APPDATA if self.radio_appdata.isChecked() else STORAGE_MODE_PORTABLE
+        cfg_p = get_settings_file_path(mode=selected_mode)
+        log_p = get_log_file_path(mode=selected_mode)
+        self.storage_cfg_path_label.setText(f"📄 配置: {cfg_p}")
+        self.storage_log_path_label.setText(f"📝 日志: {log_p}")
+
+    def _open_storage_folder(self):
+        """Open currently selected storage folder in Windows Explorer."""
+        selected_mode = STORAGE_MODE_APPDATA if self.radio_appdata.isChecked() else STORAGE_MODE_PORTABLE
+        target_dir = get_storage_dir(selected_mode)
+        try:
+            os.makedirs(target_dir, exist_ok=True)
+            QDesktopServices.openUrl(QUrl.fromLocalFile(target_dir))
+        except Exception:
+            pass
 
     def _on_opacity_slider_changed(self, val: int):
         """Update opacity label and live-preview transparency on floating window."""
@@ -382,9 +480,11 @@ class SettingsDialog(QDialog):
         self.settings.enable_ttft = self.ttft_check.isChecked()
         self.settings.start_mini = self.start_mini_check.isChecked()
         self.settings.locked = self.lock_check.isChecked()
+        new_storage_mode = STORAGE_MODE_APPDATA if self.radio_appdata.isChecked() else STORAGE_MODE_PORTABLE
+        self.settings.storage_mode = new_storage_mode
 
-        # Save to disk
-        self.settings.save()
+        # Save to disk in designated storage mode
+        self.settings.save(target_mode=new_storage_mode)
 
         # Trigger callback in main window
         if self.on_apply_callback:

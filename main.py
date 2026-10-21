@@ -23,7 +23,7 @@ if BASE_DIR not in sys.path:
 
 from core.config import (
     DEFAULT_DB_PATH, DEFAULT_REFRESH_INTERVAL_MS,
-    AppSettings
+    AppSettings, get_log_file_path
 )
 from core.telemetry import OpenCodeTelemetry
 
@@ -80,11 +80,12 @@ def run_gui_mode(db_path: str, interval_ms: int, start_mini: bool = False):
     from PyQt5.QtWidgets import QApplication
     from ui.main_window import OpenCodeTokenMonitor
 
-    if getattr(sys, 'frozen', False):
-        app_dir = os.path.dirname(sys.executable)
-    else:
-        app_dir = BASE_DIR
-    log_path = os.path.join(app_dir, "widget.log")
+    settings = AppSettings.load()
+    log_path = get_log_file_path(settings.storage_mode)
+    try:
+        os.makedirs(os.path.dirname(log_path), exist_ok=True)
+    except Exception:
+        pass
 
     try:
         app = QApplication(sys.argv)
