@@ -26,11 +26,12 @@ from .styles import DIALOG_STYLE
 class SettingsDialog(QDialog):
     """Modern dark-themed preferences dialog with scrollable content."""
 
-    def __init__(self, current_settings: AppSettings, on_apply_callback=None, on_reset_position_callback=None, parent=None):
+    def __init__(self, current_settings: AppSettings, on_apply_callback=None, on_reset_position_callback=None, monitor_widget=None, parent=None):
         super().__init__(parent)
         self.settings = current_settings
         self.on_apply_callback = on_apply_callback
         self.on_reset_position_callback = on_reset_position_callback
+        self.monitor_widget = monitor_widget or parent
         self.orig_opacity = current_settings.opacity
 
         self.setWindowTitle(f"设置 - {APP_NAME}")
@@ -386,9 +387,10 @@ class SettingsDialog(QDialog):
     def _on_opacity_slider_changed(self, val: int):
         """Update opacity label and live-preview transparency on floating window."""
         self.opacity_val_label.setText(f"{val}%")
-        if self.parent():
+        target = self.monitor_widget or self.parent()
+        if target:
             try:
-                self.parent().setWindowOpacity(val / 100.0)
+                target.setWindowOpacity(val / 100.0)
             except Exception:
                 pass
 
@@ -430,17 +432,19 @@ class SettingsDialog(QDialog):
         """Reset all UI controls to factory default settings."""
         self.settings = AppSettings()
         self._load_from_settings()
-        if self.parent():
+        target = self.monitor_widget or self.parent()
+        if target:
             try:
-                self.parent().setWindowOpacity(1.0)
+                target.setWindowOpacity(1.0)
             except Exception:
                 pass
 
     def reject(self):
         """Restore original opacity if user cancelled without saving."""
-        if self.parent():
+        target = self.monitor_widget or self.parent()
+        if target:
             try:
-                self.parent().setWindowOpacity(self.orig_opacity)
+                target.setWindowOpacity(self.orig_opacity)
             except Exception:
                 pass
         super().reject()

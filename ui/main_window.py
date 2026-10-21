@@ -4,6 +4,7 @@ OpenCode Real-time Token Speed & Usage Floating Main Panel.
 """
 
 import os
+import sys
 from typing import List
 from PyQt5.QtCore import Qt, QTimer, QPoint, QUrl, QRect
 from PyQt5.QtWidgets import (
@@ -256,6 +257,39 @@ class OpenCodeTokenMonitor(QWidget):
         except Exception:
             pass
 
+        # 4. Periodically enforce Win32 topmost priority without stealing focus
+        self.force_topmost()
+
+    def force_topmost(self):
+        """Enforce native Win32 HWND_TOPMOST so floating widget strictly stays in front of all applications."""
+        if sys.platform == "win32" and self.isVisible():
+            try:
+                import ctypes
+                from ctypes import wintypes
+                user32 = ctypes.windll.user32
+                if not hasattr(self, "_win32_topmost_configured"):
+                    user32.SetWindowPos.argtypes = [
+                        wintypes.HWND,
+                        wintypes.HWND,
+                        ctypes.c_int,
+                        ctypes.c_int,
+                        ctypes.c_int,
+                        ctypes.c_int,
+                        ctypes.c_uint
+                    ]
+                    user32.SetWindowPos.restype = wintypes.BOOL
+                    self._win32_topmost_configured = True
+
+                hwnd = wintypes.HWND(int(self.winId()))
+                # HWND_TOPMOST = -1, SWP_NOMOVE = 0x0002, SWP_NOSIZE = 0x0001, SWP_NOACTIVATE = 0x0010
+                user32.SetWindowPos(hwnd, wintypes.HWND(-1), 0, 0, 0, 0, 0x0002 | 0x0001 | 0x0010)
+            except Exception:
+                pass
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self.force_topmost()
+
     def toggle_visibility(self):
         """Toggle floating window visibility while maintaining always-on-top order."""
         if self.isVisible():
@@ -263,8 +297,8 @@ class OpenCodeTokenMonitor(QWidget):
             self.tray.set_window_visible_state(False)
         else:
             self.show()
+            self.force_topmost()
             self.raise_()
-            self.activateWindow()
             self.tray.set_window_visible_state(True)
 
     def hide_to_tray(self):
@@ -318,7 +352,8 @@ class OpenCodeTokenMonitor(QWidget):
             current_settings=self.settings,
             on_apply_callback=self.apply_settings,
             on_reset_position_callback=self.reset_to_default_position,
-            parent=self
+            monitor_widget=self,
+            parent=None
         )
         self._settings_dialog.show()
         self._settings_dialog.raise_()
@@ -341,6 +376,7 @@ class OpenCodeTokenMonitor(QWidget):
         self.telemetry.enable_ttft = self.settings.enable_ttft
 
         self.refresh_metrics()
+        self.force_topmost()
 
     def open_help_url(self):
         """Open project GitHub repository in user's default browser."""
@@ -361,7 +397,7 @@ class OpenCodeTokenMonitor(QWidget):
             except RuntimeError:
                 self._about_dialog = None
 
-        self._about_dialog = AboutDialog(parent=self)
+        self._about_dialog = AboutDialog(parent=None)
         self._about_dialog.show()
         self._about_dialog.raise_()
         self._about_dialog.activateWindow()
@@ -416,6 +452,7 @@ class OpenCodeTokenMonitor(QWidget):
             self.settings.window_x = self.x()
             self.settings.window_y = self.y()
             self.settings.save()
+            self.force_topmost()
             event.accept()
 
     def mouseDoubleClickEvent(self, event):
