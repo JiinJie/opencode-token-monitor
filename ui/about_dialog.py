@@ -26,6 +26,7 @@ class AboutDialog(QDialog):
         self.setWindowTitle(f"关于 - {APP_NAME}")
         self.setFixedSize(420, 365)
         self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)
+        self.setFont(QFont("Microsoft YaHei UI", 9))
         self.setStyleSheet(DIALOG_STYLE)
 
         self._init_ui()

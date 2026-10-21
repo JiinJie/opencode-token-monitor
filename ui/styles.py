@@ -20,7 +20,7 @@ QMenu {
     border: 1px solid #374151;
     border-radius: 6px;
     padding: 4px;
-    font-family: 'Segoe UI', 'Microsoft YaHei';
+    font-family: 'Segoe UI', 'Microsoft YaHei UI', 'Microsoft YaHei';
     font-size: 12px;
 }
 QMenu::item {
@@ -42,7 +42,7 @@ DIALOG_STYLE = """
 QDialog {
     background-color: #12141A;
     color: #F3F4F6;
-    font-family: 'Segoe UI', 'Microsoft YaHei';
+    font-family: 'Segoe UI', 'Microsoft YaHei UI', 'Microsoft YaHei';
 }
 QFrame#dialogCard {
     background-color: #12141A;
@@ -71,6 +71,7 @@ QGroupBox::title {
 QLabel {
     color: #E2E8F0;
     font-size: 12px;
+    font-family: 'Segoe UI', 'Microsoft YaHei UI', 'Microsoft YaHei';
 }
 QLineEdit {
     background-color: #1A1D24;

@@ -33,7 +33,7 @@ class SessionRowWidget(QFrame):
 
         # 2. Project or session directory name
         self.name_label = QLabel("---", self)
-        self.name_label.setStyleSheet("color: #F3F4F6; font-size: 12px; font-weight: 600; font-family: 'Segoe UI', 'Microsoft YaHei';")
+        self.name_label.setStyleSheet("color: #F3F4F6; font-size: 12px; font-weight: 600; font-family: 'Segoe UI', 'Microsoft YaHei UI', 'Microsoft YaHei';")
         self.name_label.setMaximumWidth(140)
         layout.addWidget(self.name_label)
 
@@ -46,7 +46,7 @@ class SessionRowWidget(QFrame):
 
         # 4. Details (Elapsed | Tokens | Model)
         self.detail_label = QLabel("", self)
-        self.detail_label.setStyleSheet("color: #9CA3AF; font-size: 11px; font-family: 'Segoe UI', 'Microsoft YaHei';")
+        self.detail_label.setStyleSheet("color: #9CA3AF; font-size: 11px; font-family: 'Segoe UI', 'Microsoft YaHei UI', 'Microsoft YaHei';")
         layout.addWidget(self.detail_label)
 
     def set_badge_style(self, badge_type: str):

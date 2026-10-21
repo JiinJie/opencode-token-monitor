@@ -77,7 +77,24 @@ def run_cli_mode(db_path: str = None, interval_ms: int = None):
 
 def run_gui_mode(db_path: str, interval_ms: int, start_mini: bool = False):
     """Launch PyQt5 desktop floating widget mode."""
+    # Declare Per-Monitor DPI Awareness directly to Windows OS.
+    # This completely eliminates Windows DWM's fuzzy bilinear bitmap scaling,
+    # while strictly keeping Qt's 1:1 physical pixel coordinates so the floating window
+    # never grows or changes size, rendering text sharp and clear at its original compact size.
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            # 2 = PROCESS_PER_MONITOR_DPI_AWARE_V2
+            ctypes.windll.shcore.SetProcessDpiAwareness(2)
+        except Exception:
+            try:
+                import ctypes
+                ctypes.windll.user32.SetProcessDPIAware()
+            except Exception:
+                pass
+
     from PyQt5.QtWidgets import QApplication
+    from PyQt5.QtGui import QFont
     from ui.main_window import OpenCodeTokenMonitor
 
     settings = AppSettings.load()
@@ -91,6 +108,8 @@ def run_gui_mode(db_path: str, interval_ms: int, start_mini: bool = False):
         app = QApplication(sys.argv)
         # Keep application running in system tray when window is hidden
         app.setQuitOnLastWindowClosed(False)
+        # Set crisp unified UI font globally
+        app.setFont(QFont("Microsoft YaHei UI", 9))
 
         monitor = OpenCodeTokenMonitor(db_path=db_path, refresh_interval=interval_ms)
         if start_mini:

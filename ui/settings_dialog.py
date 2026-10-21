@@ -11,7 +11,7 @@ from PyQt5.QtWidgets import (
     QFileDialog, QFrame, QScrollArea, QWidget
 )
 from PyQt5.QtCore import Qt, QUrl
-from PyQt5.QtGui import QDesktopServices
+from PyQt5.QtGui import QDesktopServices, QFont
 
 from core.config import (
     APP_NAME, DEFAULT_DB_PATH, DEFAULT_REFRESH_INTERVAL_MS,
@@ -37,6 +37,7 @@ class SettingsDialog(QDialog):
         self.resize(560, 560)
         self.setMinimumSize(500, 420)
         self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)
+        self.setFont(QFont("Microsoft YaHei UI", 9))
         self.setStyleSheet(DIALOG_STYLE)
 
         self._init_ui()

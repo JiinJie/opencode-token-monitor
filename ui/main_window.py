@@ -116,7 +116,7 @@ class OpenCodeTokenMonitor(QWidget):
         header_layout.addWidget(title_icon)
 
         self.title_label = QLabel(f"OpenCode 监控 {APP_VERSION}", self.header)
-        self.title_label.setStyleSheet("color: #94A3B8; font-size: 10px; font-weight: 600; font-family: 'Segoe UI', 'Microsoft YaHei';")
+        self.title_label.setStyleSheet("color: #94A3B8; font-size: 10px; font-weight: 600; font-family: 'Segoe UI', 'Microsoft YaHei UI', 'Microsoft YaHei';")
         header_layout.addWidget(self.title_label)
 
         header_layout.addStretch()
