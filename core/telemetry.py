@@ -109,20 +109,30 @@ class OpenCodeTelemetry:
                 ses_id, title, directory, parent_id, s_tu = ses
                 dir_name = os.path.basename((directory or "").rstrip('/\\')) or "OpenCode"
 
-                # Query the latest assistant message in the session
+                # Query recent messages in the session and find the latest assistant message
                 cur.execute("""
                     SELECT id, time_created, time_updated, data
                     FROM message
-                    WHERE session_id = ? AND json_extract(data, '$.role') = 'assistant'
+                    WHERE session_id = ?
                     ORDER BY time_created DESC
-                    LIMIT 1
+                    LIMIT 10
                 """, (ses_id,))
-                msg_row = cur.fetchone()
-                if not msg_row:
+                msg_rows = cur.fetchall()
+
+                assistant_msg = None
+                for m_row in msg_rows:
+                    try:
+                        m_data = json.loads(m_row[3])
+                        if m_data.get("role") == "assistant":
+                            assistant_msg = (m_row[0], m_row[1], m_row[2], m_data)
+                            break
+                    except Exception:
+                        continue
+
+                if not assistant_msg:
                     continue
 
-                msg_id, m_tc, m_tu, data_raw = msg_row
-                data = json.loads(data_raw)
+                msg_id, m_tc, m_tu, data = assistant_msg
                 t_info = data.get("time", {})
                 tokens = data.get("tokens", {})
 
@@ -136,23 +146,30 @@ class OpenCodeTelemetry:
                 c_ms = t_info.get("completed")
                 cr_ms = t_info.get("created") or m_tc
 
-                # Query step start timestamp (step-start)
+                # Query parts for message (parsed via Python to ensure 100% compatibility across all SQLite versions)
                 cur.execute("""
-                    SELECT time_created FROM part
-                    WHERE message_id = ? AND json_extract(data, '$.type') = 'step-start'
-                    ORDER BY time_created DESC LIMIT 1
-                """, (msg_id,))
-                step_start_row = cur.fetchone()
-                step_start_ms = step_start_row[0] if step_start_row else cr_ms
-
-                # Query text and reasoning stream parts
-                cur.execute("""
-                    SELECT time_created, json_extract(data, '$.time.start'), json_extract(data, '$.text')
+                    SELECT time_created, data
                     FROM part
-                    WHERE message_id = ? AND json_extract(data, '$.type') IN ('reasoning', 'text')
+                    WHERE message_id = ?
                     ORDER BY time_created ASC
                 """, (msg_id,))
-                parts_data = cur.fetchall()
+                part_rows = cur.fetchall()
+
+                step_start_ms = cr_ms
+                parts_data = []
+
+                for pr in part_rows:
+                    try:
+                        p_data = json.loads(pr[1])
+                        p_type = p_data.get("type")
+                        if p_type == "step-start":
+                            step_start_ms = pr[0]
+                        elif p_type in ("reasoning", "text"):
+                            p_start = p_data.get("time", {}).get("start") or pr[0]
+                            p_text = p_data.get("text", "") or ""
+                            parts_data.append((pr[0], p_start, p_text))
+                    except Exception:
+                        continue
 
                 total_chars = sum(len(p[2] or "") for p in parts_data)
                 total_out = out_tok + reas_tok

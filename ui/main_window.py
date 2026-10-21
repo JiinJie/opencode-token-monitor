@@ -16,6 +16,7 @@ from core.config import (
     DEFAULT_REFRESH_INTERVAL_MS,
     SUPPORTED_REFRESH_INTERVALS,
     PROJECT_GITHUB,
+    APP_VERSION,
     AppSettings,
     get_resource_path
 )
@@ -111,7 +112,7 @@ class OpenCodeTokenMonitor(QWidget):
         title_icon.setStyleSheet("color: #00FFCC; font-size: 11px; font-weight: bold;")
         header_layout.addWidget(title_icon)
 
-        self.title_label = QLabel("OpenCode 监控 v1.0", self.header)
+        self.title_label = QLabel(f"OpenCode 监控 {APP_VERSION}", self.header)
         self.title_label.setStyleSheet("color: #94A3B8; font-size: 10px; font-weight: 600; font-family: 'Segoe UI', 'Microsoft YaHei';")
         header_layout.addWidget(self.title_label)
 
