@@ -5,16 +5,18 @@ OpenCode Real-time Token Speed & Usage Floating Main Panel.
 
 import os
 from typing import List
-from PyQt5.QtCore import Qt, QTimer, QPoint
+from PyQt5.QtCore import Qt, QTimer, QPoint, QUrl
 from PyQt5.QtWidgets import (
     QWidget, QFrame, QVBoxLayout, QHBoxLayout,
     QLabel, QMenu, QAction, QApplication
 )
-from PyQt5.QtGui import QCursor, QIcon
+from PyQt5.QtGui import QCursor, QIcon, QDesktopServices
 
 from core.config import (
     DEFAULT_REFRESH_INTERVAL_MS,
     SUPPORTED_REFRESH_INTERVALS,
+    PROJECT_GITHUB,
+    AppSettings,
     get_resource_path
 )
 from core.telemetry import OpenCodeTelemetry
@@ -23,24 +25,41 @@ from core.models import MonitorState
 from .styles import CARD_STYLE, MENU_STYLE
 from .session_row import SessionRowWidget
 from .tray_manager import TrayManager
+from .settings_dialog import SettingsDialog
+from .about_dialog import AboutDialog
 
 
 class OpenCodeTokenMonitor(QWidget):
     """OpenCode Real-time Token Speed and Usage Floating Widget (Foreground/Background session support)."""
 
-    def __init__(self, db_path: str = None, refresh_interval: int = DEFAULT_REFRESH_INTERVAL_MS):
+    def __init__(self, db_path: str = None, refresh_interval: int = None):
         super().__init__()
         self.drag_position = QPoint()
         self.mini_mode = False
-        self.locked = False
-        self.refresh_interval = refresh_interval
+
+        # Load persistent configuration
+        self.settings = AppSettings.load()
+        if db_path:
+            self.settings.db_path = db_path
+        if refresh_interval:
+            self.settings.refresh_interval_ms = refresh_interval
+
+        self.locked = self.settings.locked
+        self.refresh_interval = self.settings.refresh_interval_ms
 
         # Telemetry core engine
-        self.telemetry = OpenCodeTelemetry(db_path) if db_path else OpenCodeTelemetry()
+        self.telemetry = OpenCodeTelemetry(
+            db_path=self.settings.db_path,
+            enable_anti_burst=self.settings.enable_anti_burst,
+            enable_ttft=self.settings.enable_ttft
+        )
 
         self.rows: List[SessionRowWidget] = []
         self._init_ui()
         self._init_tray()
+
+        # Apply opacity from settings
+        self.setWindowOpacity(self.settings.opacity)
 
         # Polling timer
         self.timer = QTimer(self)
@@ -50,13 +69,16 @@ class OpenCodeTokenMonitor(QWidget):
         # Initial refresh
         self.refresh_metrics()
 
+        # Check startup mode
+        if self.settings.start_mini and not self.mini_mode:
+            self.toggle_mini_mode()
+
     def _init_ui(self):
         """Initialize window geometry, flags, and layout."""
-        self.setWindowFlags(
-            Qt.FramelessWindowHint |
-            Qt.WindowStaysOnTopHint |
-            Qt.Tool
-        )
+        flags = Qt.FramelessWindowHint | Qt.Tool
+        if self.settings.always_on_top:
+            flags |= Qt.WindowStaysOnTopHint
+        self.setWindowFlags(flags)
         self.setAttribute(Qt.WA_TranslucentBackground, True)
 
         # Set application icon
@@ -95,7 +117,7 @@ class OpenCodeTokenMonitor(QWidget):
         title_icon.setStyleSheet("color: #00FFCC; font-size: 11px; font-weight: bold;")
         header_layout.addWidget(title_icon)
 
-        self.title_label = QLabel("OpenCode 监控 v1.0", self.header)
+        self.title_label = QLabel("OpenCode 监控", self.header)
         self.title_label.setStyleSheet("color: #94A3B8; font-size: 10px; font-weight: 600; font-family: 'Segoe UI', 'Microsoft YaHei';")
         header_layout.addWidget(self.title_label)
 
@@ -139,6 +161,9 @@ class OpenCodeTokenMonitor(QWidget):
             on_toggle_lock=self.toggle_lock,
             on_change_interval=self.set_refresh_rate,
             on_quit=self.quit_app,
+            on_open_settings=self.open_settings,
+            on_open_help=self.open_help_url,
+            on_open_about=self.open_about_dialog,
             parent=self
         )
 
@@ -147,7 +172,7 @@ class OpenCodeTokenMonitor(QWidget):
         state: MonitorState = self.telemetry.collect()
 
         if not state.db_exists:
-            self.rows[0].update_data("idle", "[无库]", "未找到OpenCode库", "0.0 tok/s", "#6B7280", "请检查路径")
+            self.rows[0].update_data("idle", "[无库]", "未找到OpenCode库", "0.0 tok/s", "#6B7280", "请检查数据库路径设置")
             return
 
         if not state.foreground_session:
@@ -211,12 +236,56 @@ class OpenCodeTokenMonitor(QWidget):
     def toggle_lock(self):
         """Toggle position dragging lock."""
         self.locked = not self.locked
+        self.settings.locked = self.locked
+        self.settings.save()
         self.tray.set_lock_state(self.locked)
 
     def set_refresh_rate(self, ms: int):
         """Update polling frequency interval."""
         self.refresh_interval = ms
+        self.settings.refresh_interval_ms = ms
+        self.settings.save()
         self.timer.setInterval(ms)
+
+    def open_settings(self):
+        """Open Settings dialog."""
+        dialog = SettingsDialog(
+            current_settings=self.settings,
+            on_apply_callback=self.apply_settings,
+            parent=self
+        )
+        dialog.exec_()
+
+    def apply_settings(self, new_settings: AppSettings):
+        """Dynamically apply updated settings without restarting."""
+        self.settings = new_settings
+        self.refresh_interval = self.settings.refresh_interval_ms
+        self.timer.setInterval(self.refresh_interval)
+        self.setWindowOpacity(self.settings.opacity)
+        self.locked = self.settings.locked
+        self.tray.set_lock_state(self.locked)
+
+        # Update telemetry parameters
+        self.telemetry.db_path = self.settings.db_path
+        self.telemetry.enable_anti_burst = self.settings.enable_anti_burst
+        self.telemetry.enable_ttft = self.settings.enable_ttft
+
+        # Update topmost flag if changed
+        is_currently_on_top = bool(self.windowFlags() & Qt.WindowStaysOnTopHint)
+        if is_currently_on_top != self.settings.always_on_top:
+            self.setWindowFlag(Qt.WindowStaysOnTopHint, self.settings.always_on_top)
+            self.show()
+
+        self.refresh_metrics()
+
+    def open_help_url(self):
+        """Open project GitHub repository in user's default browser."""
+        QDesktopServices.openUrl(QUrl(PROJECT_GITHUB))
+
+    def open_about_dialog(self):
+        """Open About modal dialog."""
+        dialog = AboutDialog(parent=self)
+        dialog.exec_()
 
     def quit_app(self):
         """Safely terminate the application."""
@@ -263,6 +332,22 @@ class OpenCodeTokenMonitor(QWidget):
                 act.setText("✔ " + label)
             act.triggered.connect(lambda checked, m=ms: self.set_refresh_rate(m))
             rate_menu.addAction(act)
+
+        # 需求一：在刷新频率下方增加“设置”
+        settings_act = QAction("设置", self)
+        settings_act.triggered.connect(self.open_settings)
+        menu.addAction(settings_act)
+
+        # 需求二：在设置下方增加“帮助”，鼠标悬停显示“帮助”和“关于”
+        help_menu = menu.addMenu("帮助")
+
+        help_doc_act = QAction("帮助", self)
+        help_doc_act.triggered.connect(self.open_help_url)
+        help_menu.addAction(help_doc_act)
+
+        about_act = QAction("关于", self)
+        about_act.triggered.connect(self.open_about_dialog)
+        help_menu.addAction(about_act)
 
         menu.addSeparator()
 

@@ -22,6 +22,9 @@ class TrayManager:
         on_toggle_lock: Callable[[], None],
         on_change_interval: Callable[[int], None],
         on_quit: Callable[[], None],
+        on_open_settings: Optional[Callable[[], None]] = None,
+        on_open_help: Optional[Callable[[], None]] = None,
+        on_open_about: Optional[Callable[[], None]] = None,
         parent=None
     ):
         self.parent = parent
@@ -30,6 +33,9 @@ class TrayManager:
         self.on_toggle_lock = on_toggle_lock
         self.on_change_interval = on_change_interval
         self.on_quit = on_quit
+        self.on_open_settings = on_open_settings
+        self.on_open_help = on_open_help
+        self.on_open_about = on_open_about
 
         self.tray_icon = QSystemTrayIcon(parent)
         self.has_shown_minimize_balloon = False
@@ -54,7 +60,7 @@ class TrayManager:
         if icon and not icon.isNull():
             self.tray_icon.setIcon(icon)
 
-        self.tray_icon.setToolTip("OpenCode Token 实时监控器 v1.0")
+        self.tray_icon.setToolTip("OpenCode Token 实时监控器")
 
     def _init_menu(self):
         """Construct system tray context menu."""
@@ -81,6 +87,24 @@ class TrayManager:
             act = QAction(label, self.menu)
             act.triggered.connect(lambda checked, m=ms: self.on_change_interval(m))
             rate_menu.addAction(act)
+
+        # Settings
+        if self.on_open_settings:
+            act_settings = QAction("设置", self.menu)
+            act_settings.triggered.connect(self.on_open_settings)
+            self.menu.addAction(act_settings)
+
+        # Help submenu (hover expands Help and About)
+        help_menu = self.menu.addMenu("帮助")
+        if self.on_open_help:
+            act_help = QAction("帮助", self.menu)
+            act_help.triggered.connect(self.on_open_help)
+            help_menu.addAction(act_help)
+
+        if self.on_open_about:
+            act_about = QAction("关于", self.menu)
+            act_about.triggered.connect(self.on_open_about)
+            help_menu.addAction(act_about)
 
         self.menu.addSeparator()
 

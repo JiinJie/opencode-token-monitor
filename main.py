@@ -14,19 +14,30 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
-from core.config import DEFAULT_DB_PATH, DEFAULT_REFRESH_INTERVAL_MS
+from core.config import (
+    DEFAULT_DB_PATH, DEFAULT_REFRESH_INTERVAL_MS,
+    AppSettings
+)
 from core.telemetry import OpenCodeTelemetry
 
 
-def run_cli_mode(db_path: str, interval_ms: int):
+def run_cli_mode(db_path: str = None, interval_ms: int = None):
     """Pure CLI terminal monitor mode (requires no graphical display)."""
-    telemetry = OpenCodeTelemetry(db_path)
-    interval_s = max(0.2, interval_ms / 1000.0)
+    settings = AppSettings.load()
+    target_db = db_path or settings.db_path
+    target_interval = interval_ms or settings.refresh_interval_ms
+
+    telemetry = OpenCodeTelemetry(
+        db_path=target_db,
+        enable_anti_burst=settings.enable_anti_burst,
+        enable_ttft=settings.enable_ttft
+    )
+    interval_s = max(0.2, target_interval / 1000.0)
 
     print("=" * 65)
     print("  OpenCode Token Monitor (CLI Mode)")
-    print(f"  Telemetry Database: {db_path}")
-    print(f"  Polling Interval: {interval_ms} ms | Press Ctrl+C to exit")
+    print(f"  Telemetry Database: {target_db}")
+    print(f"  Polling Interval: {target_interval} ms | Press Ctrl+C to exit")
     print("=" * 65)
 
     try:
@@ -90,8 +101,8 @@ def run_gui_mode(db_path: str, interval_ms: int, start_mini: bool = False):
 
 def main():
     parser = argparse.ArgumentParser(description="OpenCode Real-time Token Speed and Usage Desktop Floating Monitor")
-    parser.add_argument("--db-path", default=DEFAULT_DB_PATH, help="Specify path to OpenCode SQLite telemetry database")
-    parser.add_argument("--interval", type=int, default=DEFAULT_REFRESH_INTERVAL_MS, help="Refresh polling interval (milliseconds)")
+    parser.add_argument("--db-path", default=None, help="Specify path to OpenCode SQLite telemetry database (default: from settings or ~/.local/share/opencode/opencode.db)")
+    parser.add_argument("--interval", type=int, default=None, help="Refresh polling interval in milliseconds (default: from settings or 500ms)")
     parser.add_argument("--cli", action="store_true", help="Run in terminal CLI mode without starting GUI")
     parser.add_argument("--mini", action="store_true", help="Start minimized in 1-row mini capsule mode")
 

@@ -15,9 +15,10 @@ V1.0_cn/
 *.backup.md
 *.bak
 
-# Logs and databases
+# Logs, databases and local settings
 *.log
 widget.log
+settings.json
 *.sqlite
 *.sqlite3
 *.db

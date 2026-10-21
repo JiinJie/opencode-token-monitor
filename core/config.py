@@ -1,10 +1,20 @@
 # -*- coding: utf-8 -*-
 """
-Core configuration and global constants.
+Core configuration, global constants, metadata, and persistent settings manager.
 """
 
 import os
 import sys
+import json
+from dataclasses import dataclass, asdict
+
+# Application metadata
+APP_NAME = "OpenCode Token Monitor"
+APP_VERSION = "v1.1.0"
+APP_DESCRIPTION = "专为 OpenCode 打造的轻量级实时 Token 速率与用量悬浮监控器"
+AUTHOR_NAME = "JiinJie"
+AUTHOR_GITHUB = "https://github.com/JiinJie"
+PROJECT_GITHUB = "https://github.com/JiinJie/opencode-token-monitor"
 
 # Default OpenCode SQLite telemetry database path
 DEFAULT_DB_PATH = os.environ.get("OPENCODE_DB_PATH") or os.path.expanduser(
@@ -54,3 +64,49 @@ def get_resource_path(relative_path: str) -> str:
         return p_root
 
     return relative_path
+
+
+def get_settings_file_path() -> str:
+    """Get the path to local persistent settings JSON file."""
+    if getattr(sys, 'frozen', False):
+        base_dir = os.path.dirname(sys.executable)
+    else:
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base_dir, "settings.json")
+
+
+@dataclass
+class AppSettings:
+    """Application persistent user configuration model."""
+    db_path: str = DEFAULT_DB_PATH
+    refresh_interval_ms: int = DEFAULT_REFRESH_INTERVAL_MS
+    start_mini: bool = False
+    always_on_top: bool = True
+    locked: bool = False
+    opacity: float = 0.95
+    enable_anti_burst: bool = True
+    enable_ttft: bool = True
+
+    @classmethod
+    def load(cls) -> "AppSettings":
+        """Load settings from JSON file or fall back to defaults."""
+        path = get_settings_file_path()
+        if os.path.exists(path):
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    valid_keys = {k: v for k, v in data.items() if k in cls.__dataclass_fields__}
+                    return cls(**valid_keys)
+            except Exception:
+                pass
+        return cls()
+
+    def save(self) -> bool:
+        """Persist current settings to JSON file."""
+        path = get_settings_file_path()
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(asdict(self), f, indent=2, ensure_ascii=False)
+            return True
+        except Exception:
+            return False

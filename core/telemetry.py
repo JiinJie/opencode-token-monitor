@@ -24,8 +24,15 @@ from .models import SessionMetrics, MonitorState
 class OpenCodeTelemetry:
     """OpenCode Telemetry Collector."""
 
-    def __init__(self, db_path: str = DEFAULT_DB_PATH):
+    def __init__(
+        self,
+        db_path: str = DEFAULT_DB_PATH,
+        enable_anti_burst: bool = True,
+        enable_ttft: bool = True
+    ):
         self.db_path = db_path
+        self.enable_anti_burst = enable_anti_burst
+        self.enable_ttft = enable_ttft
 
     def collect(self) -> MonitorState:
         """
@@ -162,14 +169,14 @@ class OpenCodeTelemetry:
 
                 if not c_ms:
                     # Request in progress (completed timestamp not yet recorded)
-                    if not parts_data or total_chars == 0:
+                    if self.enable_ttft and (not parts_data or total_chars == 0):
                         # Phase 1: Waiting for first token from server (TTFT stage)
                         is_waiting_ttft = True
                         ttft_s = max(0.1, (now_ms - step_start_ms) / 1000.0)
                     else:
                         # Phase 2: Active streaming decoding
                         is_generating = True
-                        first_tok_ms = parts_data[0][1] or parts_data[0][0]
+                        first_tok_ms = parts_data[0][1] or parts_data[0][0] if parts_data else step_start_ms
                         ttft_s = max(0.01, (first_tok_ms - step_start_ms) / 1000.0)
                         decode_s = max(0.1, (now_ms - first_tok_ms) / 1000.0)
                         total_s = max(0.1, (now_ms - step_start_ms) / 1000.0)
@@ -194,8 +201,10 @@ class OpenCodeTelemetry:
 
                     # Anti-Burst Detection:
                     # Conditions: extremely fast transfer with many tokens, or long total time with very low decode ratio
-                    if (decode_s < BURST_DECODE_THRESHOLD_S and total_out > BURST_MIN_TOKENS) or \
-                       (total_s > BURST_MIN_TOTAL_S and (decode_s / total_s) < BURST_RATIO_THRESHOLD):
+                    if self.enable_anti_burst and (
+                        (decode_s < BURST_DECODE_THRESHOLD_S and total_out > BURST_MIN_TOKENS) or \
+                        (total_s > BURST_MIN_TOTAL_S and (decode_s / total_s) < BURST_RATIO_THRESHOLD)
+                    ):
                         is_burst = True
                         tps = effective_tps  # Fallback to end-to-end human-perceived throughput
                     else:
