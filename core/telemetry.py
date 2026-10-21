@@ -91,6 +91,7 @@ class OpenCodeTelemetry:
         """Connect to SQLite WAL in read-only mode for non-blocking analysis."""
         results: List[SessionMetrics] = []
         now_ms = time.time() * 1000
+        conn = None
 
         try:
             # Open SQLite in read-only URI mode to guarantee zero write locks and zero conflicts
@@ -296,10 +297,15 @@ class OpenCodeTelemetry:
                 )
                 results.append(metric)
 
-            conn.close()
         except Exception as e:
             # Silent protection to avoid crashing external consumers
             pass
+        finally:
+            if conn:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
 
         return results
 

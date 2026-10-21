@@ -8,7 +8,7 @@ from typing import Callable, Optional
 from PyQt5.QtWidgets import QSystemTrayIcon, QMenu, QAction, QApplication
 from PyQt5.QtGui import QIcon
 
-from core.config import get_resource_path, SUPPORTED_REFRESH_INTERVALS
+from core.config import get_resource_path, SUPPORTED_REFRESH_INTERVALS, APP_VERSION
 from .styles import MENU_STYLE
 
 
@@ -60,7 +60,7 @@ class TrayManager:
         if icon and not icon.isNull():
             self.tray_icon.setIcon(icon)
 
-        self.tray_icon.setToolTip("OpenCode Token 实时监控器")
+        self.tray_icon.setToolTip(f"OpenCode Token 实时监控器 {APP_VERSION}")
 
     def _init_menu(self):
         """Construct system tray context menu."""
@@ -136,7 +136,7 @@ class TrayManager:
 
     def update_tooltip(self, name: str, speed: str):
         """Update system tray hover tooltip dynamically."""
-        self.tray_icon.setToolTip(f"OpenCode Token 监控器 v1.0\n当前: {name} | {speed}")
+        self.tray_icon.setToolTip(f"OpenCode Token 监控器 {APP_VERSION}\n当前: {name} | {speed}")
 
     def show_minimize_toast(self):
         """Display toast notification on first minimize to tray."""

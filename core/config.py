@@ -6,6 +6,7 @@ Core configuration, global constants, metadata, and persistent settings manager.
 import os
 import sys
 import json
+from typing import Optional
 from dataclasses import dataclass, asdict
 
 # Application metadata
@@ -85,6 +86,9 @@ class AppSettings:
     enable_ttft: bool = True
     start_mini: bool = False
     locked: bool = False
+    window_x: Optional[int] = None
+    window_y: Optional[int] = None
+    opacity: float = 1.0  # Range: 0.5 - 1.0 (50% to 100%)
 
     @classmethod
     def load(cls) -> "AppSettings":
@@ -98,6 +102,8 @@ class AppSettings:
                     inst = cls(**valid_keys)
                     if not (1 <= inst.display_rows <= 8):
                         inst.display_rows = 3
+                    if not (0.3 <= inst.opacity <= 1.0):
+                        inst.opacity = 1.0
                     return inst
             except Exception:
                 pass

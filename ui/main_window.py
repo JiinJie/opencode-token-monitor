@@ -5,7 +5,7 @@ OpenCode Real-time Token Speed & Usage Floating Main Panel.
 
 import os
 from typing import List
-from PyQt5.QtCore import Qt, QTimer, QPoint, QUrl
+from PyQt5.QtCore import Qt, QTimer, QPoint, QUrl, QRect
 from PyQt5.QtWidgets import (
     QWidget, QFrame, QVBoxLayout, QHBoxLayout,
     QLabel, QMenu, QAction, QApplication
@@ -75,6 +75,7 @@ class OpenCodeTokenMonitor(QWidget):
             Qt.Tool
         )
         self.setAttribute(Qt.WA_TranslucentBackground, True)
+        self.setWindowOpacity(self.settings.opacity)
 
         # Set application icon
         ico_file = get_resource_path("app_icon.ico")
@@ -122,7 +123,7 @@ class OpenCodeTokenMonitor(QWidget):
         self.mode_btn = QLabel("–", self.header)
         self.mode_btn.setCursor(Qt.PointingHandCursor)
         self.mode_btn.setStyleSheet("color: #64748B; font-size: 13px; font-weight: bold; padding: 0 4px;")
-        self.mode_btn.setToolTip("双击面板或点击此处切换 单行/三行 模式")
+        self.mode_btn.setToolTip("双击面板或点击此处切换 单行/完整 模式")
         self.mode_btn.mousePressEvent = lambda e: self.toggle_mini_mode()
         header_layout.addWidget(self.mode_btn)
 
@@ -141,9 +142,38 @@ class OpenCodeTokenMonitor(QWidget):
 
         self.adjustSize()
 
-        # Default position: top right of primary screen
-        screen = QApplication.primaryScreen().geometry()
-        self.move(screen.width() - self.sizeHint().width() - 35, 45)
+        # Restore window position with screen boundary validation
+        self._restore_position()
+
+    def _restore_position(self):
+        """Restore window position from persistent settings with screen bounds validation."""
+        saved_x = self.settings.window_x
+        saved_y = self.settings.window_y
+
+        is_valid = False
+        if saved_x is not None and saved_y is not None:
+            for screen in QApplication.screens():
+                geom = screen.availableGeometry()
+                check_rect = QRect(saved_x, saved_y, min(60, self.width()), min(30, self.height()))
+                if geom.intersects(check_rect):
+                    is_valid = True
+                    break
+
+        if is_valid:
+            self.move(saved_x, saved_y)
+        else:
+            self.reset_to_default_position()
+
+    def reset_to_default_position(self):
+        """Reset window position to top-right corner of primary screen."""
+        screen = QApplication.primaryScreen().availableGeometry()
+        w = self.sizeHint().width() if self.sizeHint().width() > 0 else 240
+        x = screen.right() - w - 35
+        y = screen.top() + 45
+        self.move(x, y)
+        self.settings.window_x = x
+        self.settings.window_y = y
+        self.settings.save()
 
     def _update_row_count(self, count: int):
         """Dynamically adjust the number of session rows (1 to 8)."""
@@ -272,6 +302,7 @@ class OpenCodeTokenMonitor(QWidget):
         dialog = SettingsDialog(
             current_settings=self.settings,
             on_apply_callback=self.apply_settings,
+            on_reset_position_callback=self.reset_to_default_position,
             parent=self
         )
         dialog.exec_()
@@ -281,6 +312,7 @@ class OpenCodeTokenMonitor(QWidget):
         self.settings = new_settings
         self.refresh_interval = self.settings.refresh_interval_ms
         self.timer.setInterval(self.refresh_interval)
+        self.setWindowOpacity(self.settings.opacity)
 
         # Dynamically update displayed rows count if changed
         if len(self.rows) != self.settings.display_rows:
@@ -303,11 +335,14 @@ class OpenCodeTokenMonitor(QWidget):
         dialog.exec_()
 
     def quit_app(self):
-        """Safely terminate the application."""
+        """Safely terminate the application and persist coordinates."""
+        self.settings.window_x = self.x()
+        self.settings.window_y = self.y()
+        self.settings.save()
         self.tray.hide()
         QApplication.instance().quit()
 
-    # Mouse drag handlers
+    # Mouse drag handlers with edge snapping & screen boundary protection
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton and not self.locked:
             self.drag_position = event.globalPos() - self.frameGeometry().topLeft()
@@ -315,7 +350,40 @@ class OpenCodeTokenMonitor(QWidget):
 
     def mouseMoveEvent(self, event):
         if event.buttons() == Qt.LeftButton and not self.locked:
-            self.move(event.globalPos() - self.drag_position)
+            new_pos = event.globalPos() - self.drag_position
+
+            # Edge Snapping and Screen Boundary Clamping
+            screen = QApplication.screenAt(event.globalPos()) or QApplication.primaryScreen()
+            if screen:
+                geom = screen.availableGeometry()
+                snap_margin = 15
+
+                # Horizontal edge snap
+                if abs(new_pos.x() - geom.left()) <= snap_margin:
+                    new_pos.setX(geom.left())
+                elif abs(new_pos.x() + self.width() - geom.right()) <= snap_margin:
+                    new_pos.setX(geom.right() - self.width())
+
+                # Vertical edge snap
+                if abs(new_pos.y() - geom.top()) <= snap_margin:
+                    new_pos.setY(geom.top())
+                elif abs(new_pos.y() + self.height() - geom.bottom()) <= snap_margin:
+                    new_pos.setY(geom.bottom() - self.height())
+
+                # Clamp within visible bounds so window never gets lost offscreen
+                clamped_x = max(geom.left() - self.width() + 60, min(new_pos.x(), geom.right() - 60))
+                clamped_y = max(geom.top(), min(new_pos.y(), geom.bottom() - 30))
+                new_pos.setX(clamped_x)
+                new_pos.setY(clamped_y)
+
+            self.move(new_pos)
+            event.accept()
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.LeftButton and not self.locked:
+            self.settings.window_x = self.x()
+            self.settings.window_y = self.y()
+            self.settings.save()
             event.accept()
 
     def mouseDoubleClickEvent(self, event):

@@ -6,7 +6,7 @@ Application preferences and settings management dialog with smooth scrolling.
 import os
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QLineEdit, QComboBox, QCheckBox, QGroupBox,
+    QLineEdit, QComboBox, QCheckBox, QGroupBox, QSlider,
     QFileDialog, QFrame, QScrollArea, QWidget
 )
 from PyQt5.QtCore import Qt
@@ -21,10 +21,12 @@ from .styles import DIALOG_STYLE
 class SettingsDialog(QDialog):
     """Modern dark-themed preferences dialog with scrollable content."""
 
-    def __init__(self, current_settings: AppSettings, on_apply_callback=None, parent=None):
+    def __init__(self, current_settings: AppSettings, on_apply_callback=None, on_reset_position_callback=None, parent=None):
         super().__init__(parent)
         self.settings = current_settings
         self.on_apply_callback = on_apply_callback
+        self.on_reset_position_callback = on_reset_position_callback
+        self.orig_opacity = current_settings.opacity
 
         self.setWindowTitle(f"设置 - {APP_NAME}")
         self.resize(560, 560)
@@ -200,6 +202,25 @@ class SettingsDialog(QDialog):
         rows_tip.setWordWrap(True)
         win_layout.addWidget(rows_tip)
 
+        # Row: Window Opacity (50% - 100%)
+        row_opacity_layout = QHBoxLayout()
+        row_opacity_label = QLabel("悬浮窗不透明度:", group_win)
+        row_opacity_label.setStyleSheet("color: #F3F4F6; font-size: 12px;")
+        row_opacity_layout.addWidget(row_opacity_label)
+
+        self.opacity_slider = QSlider(Qt.Horizontal, group_win)
+        self.opacity_slider.setRange(50, 100)
+        self.opacity_slider.setSingleStep(5)
+        self.opacity_slider.setMinimumWidth(160)
+        self.opacity_slider.valueChanged.connect(self._on_opacity_slider_changed)
+        row_opacity_layout.addWidget(self.opacity_slider)
+
+        self.opacity_val_label = QLabel("100%", group_win)
+        self.opacity_val_label.setFixedWidth(42)
+        self.opacity_val_label.setStyleSheet("color: #00FFCC; font-size: 12px; font-weight: bold; font-family: 'Consolas', 'Segoe UI';")
+        row_opacity_layout.addWidget(self.opacity_val_label)
+        win_layout.addLayout(row_opacity_layout)
+
         self.start_mini_check = QCheckBox("启动时默认进入 1 行极简迷你胶囊模式", group_win)
         self.start_mini_check.setStyleSheet("color: #F3F4F6; font-size: 12px;")
         win_layout.addWidget(self.start_mini_check)
@@ -207,6 +228,20 @@ class SettingsDialog(QDialog):
         self.lock_check = QCheckBox("锁定悬浮窗位置 (防止鼠标误触拖拽移动)", group_win)
         self.lock_check.setStyleSheet("color: #F3F4F6; font-size: 12px;")
         win_layout.addWidget(self.lock_check)
+
+        # Row: Reset Window Position
+        row_pos_layout = QHBoxLayout()
+        row_pos_label = QLabel("停靠位置异常或溢出屏幕:", group_win)
+        row_pos_label.setStyleSheet("color: #94A3B8; font-size: 11px;")
+        row_pos_layout.addWidget(row_pos_label)
+
+        reset_pos_btn = QPushButton("复位窗口至右上角", group_win)
+        reset_pos_btn.setMinimumHeight(26)
+        reset_pos_btn.setToolTip("立即将悬浮窗复位恢复到主屏幕右上角")
+        reset_pos_btn.clicked.connect(self._reset_window_position)
+        row_pos_layout.addWidget(reset_pos_btn)
+        row_pos_layout.addStretch()
+        win_layout.addLayout(row_pos_layout)
 
         scroll_layout.addWidget(group_win)
 
@@ -264,11 +299,32 @@ class SettingsDialog(QDialog):
         else:
             self.rows_combo.setCurrentIndex(2)  # Default: 3 rows
 
+        # Opacity slider
+        op_pct = int(round(self.settings.opacity * 100))
+        self.opacity_slider.setValue(max(50, min(100, op_pct)))
+        self.opacity_val_label.setText(f"{self.opacity_slider.value()}%")
+
         # Checkboxes
         self.anti_burst_check.setChecked(self.settings.enable_anti_burst)
         self.ttft_check.setChecked(self.settings.enable_ttft)
         self.start_mini_check.setChecked(self.settings.start_mini)
         self.lock_check.setChecked(self.settings.locked)
+
+    def _on_opacity_slider_changed(self, val: int):
+        """Update opacity label and live-preview transparency on floating window."""
+        self.opacity_val_label.setText(f"{val}%")
+        if self.parent():
+            try:
+                self.parent().setWindowOpacity(val / 100.0)
+            except Exception:
+                pass
+
+    def _reset_window_position(self):
+        """Invoke position reset callback to snap widget back to primary screen top-right."""
+        if self.on_reset_position_callback:
+            self.on_reset_position_callback()
+            self.db_status_label.setText("✔ 悬浮窗已成功复位至主屏幕右上角")
+            self.db_status_label.setStyleSheet("color: #10B981; font-size: 11px;")
 
     def _check_db_status(self, path: str):
         """Check whether the database path exists and update status indicator."""
@@ -301,12 +357,27 @@ class SettingsDialog(QDialog):
         """Reset all UI controls to factory default settings."""
         self.settings = AppSettings()
         self._load_from_settings()
+        if self.parent():
+            try:
+                self.parent().setWindowOpacity(1.0)
+            except Exception:
+                pass
+
+    def reject(self):
+        """Restore original opacity if user cancelled without saving."""
+        if self.parent():
+            try:
+                self.parent().setWindowOpacity(self.orig_opacity)
+            except Exception:
+                pass
+        super().reject()
 
     def _save_and_apply(self):
         """Save settings to disk and invoke callback."""
         self.settings.db_path = self.path_edit.text().strip()
         self.settings.refresh_interval_ms = self.interval_combo.currentData()
         self.settings.display_rows = self.rows_combo.currentData() or 3
+        self.settings.opacity = self.opacity_slider.value() / 100.0
         self.settings.enable_anti_burst = self.anti_burst_check.isChecked()
         self.settings.enable_ttft = self.ttft_check.isChecked()
         self.settings.start_mini = self.start_mini_check.isChecked()
