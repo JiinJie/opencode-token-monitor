@@ -5,10 +5,10 @@ About dialog displaying application metadata, version, and author details.
 
 import os
 from PyQt5.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame
+    QDialog, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QPushButton, QFrame
 )
-from PyQt5.QtCore import Qt, QUrl
-from PyQt5.QtGui import QIcon, QPixmap, QDesktopServices
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QIcon, QPixmap
 
 from core.config import (
     APP_NAME, APP_VERSION, APP_DESCRIPTION,
@@ -24,7 +24,7 @@ class AboutDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle(f"关于 - {APP_NAME}")
-        self.setFixedSize(400, 290)
+        self.setFixedSize(420, 365)
         self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)
         self.setStyleSheet(DIALOG_STYLE)
 
@@ -37,95 +37,110 @@ class AboutDialog(QDialog):
         card = QFrame(self)
         card.setObjectName("dialogCard")
         card_layout = QVBoxLayout(card)
-        card_layout.setContentsMargins(18, 16, 18, 16)
-        card_layout.setSpacing(10)
+        card_layout.setContentsMargins(22, 20, 22, 18)
+        card_layout.setSpacing(12)
 
-        # Header with app icon and title
-        header_layout = QHBoxLayout()
-        header_layout.setSpacing(12)
+        # 1. Centered Hero Header (Icon + Title + Version Badge + Description)
+        hero_box = QVBoxLayout()
+        hero_box.setSpacing(6)
+        hero_box.setAlignment(Qt.AlignCenter)
 
+        # App Icon
         icon_label = QLabel(card)
         icon_path = get_resource_path("app_icon.png")
         if os.path.exists(icon_path):
-            pixmap = QPixmap(icon_path).scaled(44, 44, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            pixmap = QPixmap(icon_path).scaled(48, 48, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             icon_label.setPixmap(pixmap)
         else:
             icon_label.setText("⚡")
-            icon_label.setStyleSheet("font-size: 28px; color: #00FFCC;")
-        header_layout.addWidget(icon_label)
+            icon_label.setStyleSheet("font-size: 32px; color: #00FFCC;")
+        icon_label.setAlignment(Qt.AlignCenter)
+        hero_box.addWidget(icon_label)
 
-        title_vbox = QVBoxLayout()
-        title_vbox.setSpacing(3)
-
-        title_row = QHBoxLayout()
+        # Centered App Title
         title_label = QLabel(APP_NAME, card)
-        title_label.setStyleSheet("font-size: 15px; font-weight: bold; color: #FFFFFF;")
-        title_row.addWidget(title_label)
+        title_label.setStyleSheet("font-size: 16px; font-weight: bold; color: #FFFFFF;")
+        title_label.setAlignment(Qt.AlignCenter)
+        hero_box.addWidget(title_label)
 
+        # Centered Version Badge
+        badge_box = QHBoxLayout()
+        badge_box.addStretch()
         ver_badge = QLabel(f" {APP_VERSION} ", card)
         ver_badge.setStyleSheet("""
-            background-color: rgba(16, 185, 129, 0.25);
+            background-color: rgba(16, 185, 129, 0.22);
             color: #10B981;
             border: 1px solid #10B981;
             border-radius: 4px;
             font-size: 11px;
             font-weight: bold;
-            padding: 1px 4px;
+            padding: 2px 8px;
         """)
-        title_row.addWidget(ver_badge)
-        title_row.addStretch()
-        title_vbox.addLayout(title_row)
+        badge_box.addWidget(ver_badge)
+        badge_box.addStretch()
+        hero_box.addLayout(badge_box)
 
+        # Subtitle
         desc_label = QLabel(APP_DESCRIPTION, card)
-        desc_label.setStyleSheet("color: #94A3B8; font-size: 11px;")
-        desc_label.setWordWrap(True)
-        title_vbox.addWidget(desc_label)
+        desc_label.setStyleSheet("color: #94A3B8; font-size: 11px; margin-top: 2px;")
+        desc_label.setAlignment(Qt.AlignCenter)
+        hero_box.addWidget(desc_label)
 
-        header_layout.addLayout(title_vbox)
-        card_layout.addLayout(header_layout)
+        card_layout.addLayout(hero_box)
 
-        # Divider
+        # 2. Divider
         div = QFrame(card)
         div.setFrameShape(QFrame.HLine)
         div.setStyleSheet("background-color: rgba(255, 255, 255, 0.08); max-height: 1px;")
         card_layout.addWidget(div)
 
-        # Info links section
-        info_layout = QVBoxLayout()
-        info_layout.setSpacing(6)
+        # 3. Clean Key-Value Grid Card
+        info_frame = QFrame(card)
+        info_frame.setStyleSheet("""
+            QFrame {
+                background-color: #171A22;
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 8px;
+            }
+        """)
+        grid = QGridLayout(info_frame)
+        grid.setContentsMargins(18, 12, 18, 12)
+        grid.setHorizontalSpacing(14)
+        grid.setVerticalSpacing(8)
 
-        author_label = QLabel(
-            f"👤 作者: <a href='{AUTHOR_GITHUB}' style='color: #38BDF8; text-decoration: none;'>{AUTHOR_NAME} (GitHub)</a>",
-            card
-        )
-        author_label.setOpenExternalLinks(True)
-        author_label.setStyleSheet("font-size: 12px; color: #CBD5E1;")
-        info_layout.addWidget(author_label)
+        lbl_author = QLabel("👤 开发作者:", info_frame)
+        lbl_author.setStyleSheet("color: #94A3B8; font-size: 12px; font-weight: 500;")
+        val_author = QLabel(f"<a href='{AUTHOR_GITHUB}' style='color: #38BDF8; text-decoration: none;'>{AUTHOR_NAME} (GitHub ↗)</a>", info_frame)
+        val_author.setOpenExternalLinks(True)
+        grid.addWidget(lbl_author, 0, 0)
+        grid.addWidget(val_author, 0, 1)
 
-        repo_label = QLabel(
-            f"🔗 开源仓库: <a href='{PROJECT_GITHUB}' style='color: #00FFCC; text-decoration: none;'>JiinJie/opencode-token-monitor</a>",
-            card
-        )
-        repo_label.setOpenExternalLinks(True)
-        repo_label.setStyleSheet("font-size: 12px; color: #CBD5E1;")
-        info_layout.addWidget(repo_label)
+        lbl_repo = QLabel("🔗 开源仓库:", info_frame)
+        lbl_repo.setStyleSheet("color: #94A3B8; font-size: 12px; font-weight: 500;")
+        val_repo = QLabel(f"<a href='{PROJECT_GITHUB}' style='color: #00FFCC; text-decoration: none;'>JiinJie/opencode-token-monitor ↗</a>", info_frame)
+        val_repo.setOpenExternalLinks(True)
+        grid.addWidget(lbl_repo, 1, 0)
+        grid.addWidget(val_repo, 1, 1)
 
-        license_label = QLabel("📄 开源协议: MIT License", card)
-        license_label.setStyleSheet("font-size: 12px; color: #64748B;")
-        info_layout.addWidget(license_label)
+        lbl_lic = QLabel("📄 开源协议:", info_frame)
+        lbl_lic.setStyleSheet("color: #94A3B8; font-size: 12px; font-weight: 500;")
+        val_lic = QLabel("MIT License", info_frame)
+        val_lic.setStyleSheet("color: #E2E8F0; font-size: 12px;")
+        grid.addWidget(lbl_lic, 2, 0)
+        grid.addWidget(val_lic, 2, 1)
 
-        card_layout.addLayout(info_layout)
+        card_layout.addWidget(info_frame)
 
+        # 4. Bottom Centered Action Button
         card_layout.addStretch()
-
-        # Bottom close button
-        btn_layout = QHBoxLayout()
-        btn_layout.addStretch()
+        btn_box = QHBoxLayout()
+        btn_box.setAlignment(Qt.AlignCenter)
         close_btn = QPushButton("确定", card)
         close_btn.setObjectName("primaryBtn")
-        close_btn.setFixedWidth(80)
+        close_btn.setMinimumHeight(32)
+        close_btn.setFixedWidth(110)
         close_btn.clicked.connect(self.accept)
-        btn_layout.addWidget(close_btn)
+        btn_box.addWidget(close_btn)
+        card_layout.addLayout(btn_box)
 
-        card_layout.addLayout(btn_layout)
         root_layout.addWidget(card)

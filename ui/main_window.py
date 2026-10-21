@@ -32,19 +32,19 @@ from .about_dialog import AboutDialog
 class OpenCodeTokenMonitor(QWidget):
     """OpenCode Real-time Token Speed and Usage Floating Widget (Foreground/Background session support)."""
 
-    def __init__(self, db_path: str = None, refresh_interval: int = None):
+    def __init__(self, db_path: str = None, refresh_interval: int = DEFAULT_REFRESH_INTERVAL_MS):
         super().__init__()
         self.drag_position = QPoint()
         self.mini_mode = False
+        self.locked = False
 
-        # Load persistent configuration
+        # Load configuration (maintaining exact original defaults)
         self.settings = AppSettings.load()
         if db_path:
             self.settings.db_path = db_path
-        if refresh_interval:
+        if refresh_interval != DEFAULT_REFRESH_INTERVAL_MS:
             self.settings.refresh_interval_ms = refresh_interval
 
-        self.locked = self.settings.locked
         self.refresh_interval = self.settings.refresh_interval_ms
 
         # Telemetry core engine
@@ -58,9 +58,6 @@ class OpenCodeTokenMonitor(QWidget):
         self._init_ui()
         self._init_tray()
 
-        # Apply opacity from settings
-        self.setWindowOpacity(self.settings.opacity)
-
         # Polling timer
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.refresh_metrics)
@@ -69,16 +66,13 @@ class OpenCodeTokenMonitor(QWidget):
         # Initial refresh
         self.refresh_metrics()
 
-        # Check startup mode
-        if self.settings.start_mini and not self.mini_mode:
-            self.toggle_mini_mode()
-
     def _init_ui(self):
-        """Initialize window geometry, flags, and layout."""
-        flags = Qt.FramelessWindowHint | Qt.Tool
-        if self.settings.always_on_top:
-            flags |= Qt.WindowStaysOnTopHint
-        self.setWindowFlags(flags)
+        """Initialize window geometry, flags, and layout (strictly preserving original style)."""
+        self.setWindowFlags(
+            Qt.FramelessWindowHint |
+            Qt.WindowStaysOnTopHint |
+            Qt.Tool
+        )
         self.setAttribute(Qt.WA_TranslucentBackground, True)
 
         # Set application icon
@@ -117,7 +111,7 @@ class OpenCodeTokenMonitor(QWidget):
         title_icon.setStyleSheet("color: #00FFCC; font-size: 11px; font-weight: bold;")
         header_layout.addWidget(title_icon)
 
-        self.title_label = QLabel("OpenCode 监控", self.header)
+        self.title_label = QLabel("OpenCode 监控 v1.0", self.header)
         self.title_label.setStyleSheet("color: #94A3B8; font-size: 10px; font-weight: 600; font-family: 'Segoe UI', 'Microsoft YaHei';")
         header_layout.addWidget(self.title_label)
 
@@ -172,7 +166,7 @@ class OpenCodeTokenMonitor(QWidget):
         state: MonitorState = self.telemetry.collect()
 
         if not state.db_exists:
-            self.rows[0].update_data("idle", "[无库]", "未找到OpenCode库", "0.0 tok/s", "#6B7280", "请检查数据库路径设置")
+            self.rows[0].update_data("idle", "[无库]", "未找到OpenCode库", "0.0 tok/s", "#6B7280", "请检查路径")
             return
 
         if not state.foreground_session:
@@ -248,7 +242,7 @@ class OpenCodeTokenMonitor(QWidget):
         self.timer.setInterval(ms)
 
     def open_settings(self):
-        """Open Settings dialog."""
+        """Open Settings preferences dialog."""
         dialog = SettingsDialog(
             current_settings=self.settings,
             on_apply_callback=self.apply_settings,
@@ -257,24 +251,15 @@ class OpenCodeTokenMonitor(QWidget):
         dialog.exec_()
 
     def apply_settings(self, new_settings: AppSettings):
-        """Dynamically apply updated settings without restarting."""
+        """Dynamically apply updated settings without modifying main window visual styles."""
         self.settings = new_settings
         self.refresh_interval = self.settings.refresh_interval_ms
         self.timer.setInterval(self.refresh_interval)
-        self.setWindowOpacity(self.settings.opacity)
-        self.locked = self.settings.locked
-        self.tray.set_lock_state(self.locked)
 
         # Update telemetry parameters
         self.telemetry.db_path = self.settings.db_path
         self.telemetry.enable_anti_burst = self.settings.enable_anti_burst
         self.telemetry.enable_ttft = self.settings.enable_ttft
-
-        # Update topmost flag if changed
-        is_currently_on_top = bool(self.windowFlags() & Qt.WindowStaysOnTopHint)
-        if is_currently_on_top != self.settings.always_on_top:
-            self.setWindowFlag(Qt.WindowStaysOnTopHint, self.settings.always_on_top)
-            self.show()
 
         self.refresh_metrics()
 

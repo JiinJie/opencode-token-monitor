@@ -163,6 +163,28 @@ QCheckBox::indicator:checked {
     background-color: #10B981;
     border-color: #10B981;
 }
+QScrollArea {
+    border: none;
+    background-color: transparent;
+}
+QScrollBar:vertical {
+    border: none;
+    background: #181A20;
+    width: 6px;
+    margin: 0px;
+    border-radius: 3px;
+}
+QScrollBar::handle:vertical {
+    background: #374151;
+    min-height: 24px;
+    border-radius: 3px;
+}
+QScrollBar::handle:vertical:hover {
+    background: #00FFCC;
+}
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0px;
+}
 """
 
 # Session status badge styling schemes

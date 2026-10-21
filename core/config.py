@@ -80,12 +80,10 @@ class AppSettings:
     """Application persistent user configuration model."""
     db_path: str = DEFAULT_DB_PATH
     refresh_interval_ms: int = DEFAULT_REFRESH_INTERVAL_MS
-    start_mini: bool = False
-    always_on_top: bool = True
-    locked: bool = False
-    opacity: float = 0.95
     enable_anti_burst: bool = True
     enable_ttft: bool = True
+    start_mini: bool = False
+    locked: bool = False
 
     @classmethod
     def load(cls) -> "AppSettings":
