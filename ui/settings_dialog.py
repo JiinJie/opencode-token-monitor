@@ -7,7 +7,7 @@ import os
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QLineEdit, QComboBox, QCheckBox, QGroupBox, QSlider,
-    QRadioButton, QButtonGroup,
+    QRadioButton, QButtonGroup, QListView,
     QFileDialog, QFrame, QScrollArea, QWidget
 )
 from PyQt5.QtCore import Qt, QUrl
@@ -15,12 +15,25 @@ from PyQt5.QtGui import QDesktopServices
 
 from core.config import (
     APP_NAME, DEFAULT_DB_PATH, DEFAULT_REFRESH_INTERVAL_MS,
+    DEFAULT_LOG_FILENAME,
     SUPPORTED_REFRESH_INTERVALS, AppSettings,
     STORAGE_MODE_PORTABLE, STORAGE_MODE_APPDATA,
     get_app_dir, get_appdata_dir, get_storage_dir,
     get_settings_file_path, get_log_file_path
 )
 from .styles import DIALOG_STYLE
+
+
+class NoWheelComboBox(QComboBox):
+    """QComboBox that ignores mouse wheel events to prevent accidental changes when scrolling."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setView(QListView())
+
+    def wheelEvent(self, event):
+        # Ignore wheel event so parent QScrollArea scrolls smoothly without accidental selection changes
+        event.ignore()
 
 
 class SettingsDialog(QDialog):
@@ -113,7 +126,7 @@ class SettingsDialog(QDialog):
         self.path_edit.textChanged.connect(self._check_db_status)
         path_row.addWidget(self.path_edit)
 
-        browse_btn = QPushButton("浏览...", group_db)
+        browse_btn = QPushButton("浏览", group_db)
         browse_btn.setFixedWidth(72)
         browse_btn.setMinimumHeight(32)
         browse_btn.clicked.connect(self._browse_db_file)
@@ -141,7 +154,7 @@ class SettingsDialog(QDialog):
 
         row_int = QHBoxLayout()
         row_int.addWidget(QLabel("采样刷新间隔:", group_perf))
-        self.interval_combo = QComboBox(group_perf)
+        self.interval_combo = NoWheelComboBox(group_perf)
         self.interval_combo.setMinimumHeight(28)
         for ms, label in SUPPORTED_REFRESH_INTERVALS:
             self.interval_combo.addItem(label, ms)
@@ -193,7 +206,7 @@ class SettingsDialog(QDialog):
         row_count_label.setStyleSheet("color: #F3F4F6; font-size: 12px;")
         row_count_layout.addWidget(row_count_label)
 
-        self.rows_combo = QComboBox(group_win)
+        self.rows_combo = NoWheelComboBox(group_win)
         self.rows_combo.setMinimumHeight(28)
         for n in range(1, 9):
             text = f"{n} 行 (默认推荐)" if n == 3 else f"{n} 行"
@@ -207,16 +220,16 @@ class SettingsDialog(QDialog):
         rows_tip.setWordWrap(True)
         win_layout.addWidget(rows_tip)
 
-        # Row: Window Opacity (50% - 100%)
+        # Row: Window Opacity (30% - 100%)
         row_opacity_layout = QHBoxLayout()
         row_opacity_label = QLabel("悬浮窗不透明度:", group_win)
         row_opacity_label.setStyleSheet("color: #F3F4F6; font-size: 12px;")
         row_opacity_layout.addWidget(row_opacity_label)
 
         self.opacity_slider = QSlider(Qt.Horizontal, group_win)
-        self.opacity_slider.setRange(50, 100)
+        self.opacity_slider.setRange(30, 100)
         self.opacity_slider.setSingleStep(5)
-        self.opacity_slider.setMinimumWidth(160)
+        self.opacity_slider.setFixedWidth(150)
         self.opacity_slider.valueChanged.connect(self._on_opacity_slider_changed)
         row_opacity_layout.addWidget(self.opacity_slider)
 
@@ -224,6 +237,7 @@ class SettingsDialog(QDialog):
         self.opacity_val_label.setFixedWidth(42)
         self.opacity_val_label.setStyleSheet("color: #00FFCC; font-size: 12px; font-weight: bold; font-family: 'Consolas', 'Segoe UI';")
         row_opacity_layout.addWidget(self.opacity_val_label)
+        row_opacity_layout.addStretch()
         win_layout.addLayout(row_opacity_layout)
 
         self.start_mini_check = QCheckBox("启动时默认进入 1 行极简迷你胶囊模式", group_win)
@@ -266,11 +280,10 @@ class SettingsDialog(QDialog):
         # Option 1: Portable Mode (app directory)
         self.radio_portable = QRadioButton("当前执行文件所在文件夹 (绿色便携模式 Portable)", group_storage)
         self.radio_portable.setStyleSheet("color: #F3F4F6; font-size: 12px; font-weight: 500;")
-        self.radio_portable.toggled.connect(self._on_storage_mode_toggled)
         self.storage_btn_group.addButton(self.radio_portable, 1)
         storage_layout.addWidget(self.radio_portable)
 
-        portable_hint = QLabel(f"• 路径: {get_app_dir()}\n  配置与日志直接跟随程序脚本/可执行文件，适合免安装便携移动使用。", group_storage)
+        portable_hint = QLabel(f"• 示意位置: 当前程序目录\\ (settings.json / {DEFAULT_LOG_FILENAME})\n  配置与日志直接跟随程序，免安装解压即用。", group_storage)
         portable_hint.setStyleSheet("color: #64748B; font-size: 11px; margin-left: 24px;")
         portable_hint.setWordWrap(True)
         storage_layout.addWidget(portable_hint)
@@ -278,33 +291,13 @@ class SettingsDialog(QDialog):
         # Option 2: Standard User AppData
         self.radio_appdata = QRadioButton("系统用户默认数据位置 (标准模式 AppData)", group_storage)
         self.radio_appdata.setStyleSheet("color: #F3F4F6; font-size: 12px; font-weight: 500;")
-        self.radio_appdata.toggled.connect(self._on_storage_mode_toggled)
         self.storage_btn_group.addButton(self.radio_appdata, 2)
         storage_layout.addWidget(self.radio_appdata)
 
-        appdata_hint = QLabel(f"• 路径: {get_appdata_dir()}\n  遵循标准 Windows 应用程序规范，不产生本地写入污染，适合日常长期使用。", group_storage)
+        appdata_hint = QLabel(f"• 示意位置: %APPDATA%\\OpenCodeTokenMonitor\\ (settings.json / {DEFAULT_LOG_FILENAME})\n  遵循标准 Windows 应用程序规范，不产生本地目录写入污染。", group_storage)
         appdata_hint.setStyleSheet("color: #64748B; font-size: 11px; margin-left: 24px;")
         appdata_hint.setWordWrap(True)
         storage_layout.addWidget(appdata_hint)
-
-        # Current active paths preview
-        paths_box = QFrame(group_storage)
-        paths_box.setStyleSheet("background-color: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 6px; padding: 6px 10px;")
-        paths_layout = QVBoxLayout(paths_box)
-        paths_layout.setContentsMargins(0, 0, 0, 0)
-        paths_layout.setSpacing(4)
-
-        self.storage_cfg_path_label = QLabel(paths_box)
-        self.storage_cfg_path_label.setStyleSheet("color: #94A3B8; font-size: 11px; font-family: 'Consolas', 'Segoe UI';")
-        self.storage_cfg_path_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        paths_layout.addWidget(self.storage_cfg_path_label)
-
-        self.storage_log_path_label = QLabel(paths_box)
-        self.storage_log_path_label.setStyleSheet("color: #94A3B8; font-size: 11px; font-family: 'Consolas', 'Segoe UI';")
-        self.storage_log_path_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        paths_layout.addWidget(self.storage_log_path_label)
-
-        storage_layout.addWidget(paths_box)
 
         # Action: Open Storage Folder
         storage_action_row = QHBoxLayout()
@@ -374,7 +367,7 @@ class SettingsDialog(QDialog):
 
         # Opacity slider
         op_pct = int(round(self.settings.opacity * 100))
-        self.opacity_slider.setValue(max(50, min(100, op_pct)))
+        self.opacity_slider.setValue(max(30, min(100, op_pct)))
         self.opacity_val_label.setText(f"{self.opacity_slider.value()}%")
 
         # Checkboxes
@@ -388,15 +381,6 @@ class SettingsDialog(QDialog):
             self.radio_appdata.setChecked(True)
         else:
             self.radio_portable.setChecked(True)
-        self._on_storage_mode_toggled()
-
-    def _on_storage_mode_toggled(self):
-        """Update active path display when user toggles storage radio button."""
-        selected_mode = STORAGE_MODE_APPDATA if self.radio_appdata.isChecked() else STORAGE_MODE_PORTABLE
-        cfg_p = get_settings_file_path(mode=selected_mode)
-        log_p = get_log_file_path(mode=selected_mode)
-        self.storage_cfg_path_label.setText(f"📄 配置: {cfg_p}")
-        self.storage_log_path_label.setText(f"📝 日志: {log_p}")
 
     def _open_storage_folder(self):
         """Open currently selected storage folder in Windows Explorer."""

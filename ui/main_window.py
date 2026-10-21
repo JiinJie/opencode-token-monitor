@@ -38,6 +38,8 @@ class OpenCodeTokenMonitor(QWidget):
         self.drag_position = QPoint()
         self.mini_mode = False
         self.locked = False
+        self._settings_dialog = None
+        self._about_dialog = None
 
         # Load configuration (maintaining exact original defaults)
         self.settings = AppSettings.load()
@@ -298,14 +300,29 @@ class OpenCodeTokenMonitor(QWidget):
         self.timer.setInterval(valid_ms)
 
     def open_settings(self):
-        """Open Settings preferences dialog."""
-        dialog = SettingsDialog(
+        """Open Settings preferences dialog, bringing to front if already open."""
+        if hasattr(self, "_settings_dialog") and self._settings_dialog is not None:
+            try:
+                if self._settings_dialog.isVisible():
+                    self._settings_dialog.setWindowState(
+                        (self._settings_dialog.windowState() & ~Qt.WindowMinimized) | Qt.WindowActive
+                    )
+                    self._settings_dialog.show()
+                    self._settings_dialog.raise_()
+                    self._settings_dialog.activateWindow()
+                    return
+            except RuntimeError:
+                self._settings_dialog = None
+
+        self._settings_dialog = SettingsDialog(
             current_settings=self.settings,
             on_apply_callback=self.apply_settings,
             on_reset_position_callback=self.reset_to_default_position,
             parent=self
         )
-        dialog.exec_()
+        self._settings_dialog.show()
+        self._settings_dialog.raise_()
+        self._settings_dialog.activateWindow()
 
     def apply_settings(self, new_settings: AppSettings):
         """Dynamically apply updated settings without modifying main window visual styles."""
@@ -330,9 +347,24 @@ class OpenCodeTokenMonitor(QWidget):
         QDesktopServices.openUrl(QUrl(PROJECT_GITHUB))
 
     def open_about_dialog(self):
-        """Open About modal dialog."""
-        dialog = AboutDialog(parent=self)
-        dialog.exec_()
+        """Open About modal dialog, bringing to front if already open."""
+        if hasattr(self, "_about_dialog") and self._about_dialog is not None:
+            try:
+                if self._about_dialog.isVisible():
+                    self._about_dialog.setWindowState(
+                        (self._about_dialog.windowState() & ~Qt.WindowMinimized) | Qt.WindowActive
+                    )
+                    self._about_dialog.show()
+                    self._about_dialog.raise_()
+                    self._about_dialog.activateWindow()
+                    return
+            except RuntimeError:
+                self._about_dialog = None
+
+        self._about_dialog = AboutDialog(parent=self)
+        self._about_dialog.show()
+        self._about_dialog.raise_()
+        self._about_dialog.activateWindow()
 
     def quit_app(self):
         """Safely terminate the application and persist coordinates."""
