@@ -14,10 +14,15 @@ ICON_PATH = os.path.join(BASE_DIR, "assets", "app_icon.ico")
 if not os.path.exists(ICON_PATH):
     ICON_PATH = os.path.join(BASE_DIR, "app_icon.ico")
 
+from core.config import APP_VERSION
+
 
 def build():
+    version_tag = APP_VERSION
+    target_name = f"OpenCodeTokenMonitor_{version_tag}"
+
     print("=" * 60)
-    print("  Building OpenCodeTokenMonitor (Standalone Portable Version)")
+    print(f"  Building {target_name} (Standalone Portable Version)")
     print("=" * 60)
 
     cmd = [
@@ -31,7 +36,7 @@ def build():
         "--add-data", f"{os.path.join(BASE_DIR, 'assets')};assets",
         "--add-data", f"{os.path.join(BASE_DIR, 'app_icon.ico')};.",
         "--add-data", f"{os.path.join(BASE_DIR, 'app_icon.png')};.",
-        "--name", "OpenCodeTokenMonitor_v1.0",
+        "--name", target_name,
         os.path.join(BASE_DIR, "main.py")
     ]
 
@@ -40,16 +45,19 @@ def build():
 
     if res.returncode == 0:
         dist_dir = os.path.join(BASE_DIR, "dist")
-        exe_v1 = os.path.join(dist_dir, "OpenCodeTokenMonitor_v1.0.exe")
+        exe_versioned = os.path.join(dist_dir, f"{target_name}.exe")
         exe_std = os.path.join(dist_dir, "OpenCodeTokenMonitor.exe")
-        if os.path.exists(exe_v1):
-            shutil.copy2(exe_v1, exe_std)
+        exe_v1 = os.path.join(dist_dir, "OpenCodeTokenMonitor_v1.0.exe")
+        if os.path.exists(exe_versioned):
+            shutil.copy2(exe_versioned, exe_std)
             print("[OK] Synced as OpenCodeTokenMonitor.exe")
+            shutil.copy2(exe_versioned, exe_v1)
+            print("[OK] Synced as OpenCodeTokenMonitor_v1.0.exe")
 
         # Generate portable zip package
         import zipfile
-        zip_path = os.path.join(dist_dir, "OpenCodeTokenMonitor_v1.0_Portable.zip")
-        files_to_zip = ["OpenCodeTokenMonitor_v1.0.exe", "app_icon.ico", "app_icon.png", "stop.bat", "使用说明.txt"]
+        zip_path = os.path.join(dist_dir, f"{target_name}_Portable.zip")
+        files_to_zip = [f"{target_name}.exe", "app_icon.ico", "app_icon.png", "stop.bat", "使用说明.txt"]
         with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
             for fname in files_to_zip:
                 fpath = os.path.join(dist_dir, fname)
@@ -57,6 +65,12 @@ def build():
                     zf.write(fpath, arcname=fname)
                     print(f"  + Added file: {fname}")
         print(f"[OK] Portable zip generated: {zip_path}")
+        
+        # Also sync general zip names
+        zip_std = os.path.join(dist_dir, "OpenCodeTokenMonitor_Portable.zip")
+        shutil.copy2(zip_path, zip_std)
+        zip_v1 = os.path.join(dist_dir, "OpenCodeTokenMonitor_v1.0_Portable.zip")
+        shutil.copy2(zip_path, zip_v1)
         print("\n[SUCCESS] Build completed successfully! Deliverables are in dist/")
     else:
         print("\n[ERROR] Build failed, please check the log above.")
